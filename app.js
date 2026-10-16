@@ -1,5 +1,9 @@
 const $=s=>document.querySelector(s);let questions=[],session=[],index=0,mode='learn',answers={},results=[],examFlags=new Set(),deferredInstall=null;const STORE='iweTrainerProgressV1';const PASS_THRESHOLD=60;let MODULES=['I','II','III','IV','I N','II N','III N','IV N'];let examTimer=null,examDeadline=0,examTimeExpired=false;let progress=loadProgress();progress.history ||= [];progress.examHistory ||= [];function loadProgress(){try{return JSON.parse(localStorage.getItem(STORE))||{byId:{},sessions:0,answered:0,perfect:0}}catch(e){return{byId:{},sessions:0,answered:0,perfect:0}}}function saveProgress(){try{localStorage.setItem(STORE,JSON.stringify(progress))}catch(e){console.warn("Zapis lokalny niedostępny",e)}renderStats()}function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function switchScreen(id){document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));window.scrollTo({top:0,behavior:'smooth'})}function usable(){return questions.filter(q=>q.options.length>0&&($('#includeUnknown').checked||q.hasKey))}function normalizeModule(value){const s=String(value??'').trim().toUpperCase().replace(/^MODUŁ\s*/, '').replace(/^MODUL\s*/, '');const m=s.match(/^(I|II|III|IV)(?:\s*N)?$/);return m?s:s}function selectedModules(){return [...document.querySelectorAll('.module-check:checked')].map(x=>normalizeModule(x.value))}function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}function startQuiz(newMode,review=false,preset=null){stopExamTimer();examTimeExpired=false;mode=newMode;let chosenModules=selectedModules();if(!chosenModules.length){document.querySelectorAll('.module-check').forEach(x=>x.checked=true);chosenModules=MODULES.slice();}let list=usable().filter(q=>chosenModules.includes(normalizeModule(q.module)));
-if(!list.length){console.error('IWE: brak pytań dla modułów',chosenModules,'; przykładowe moduły w bazie:',[...new Set(questions.map(q=>q.module))]);alert('Nie znaleziono pytań dla zaznaczonych modułów. Spróbuj odświeżyć aplikację i ponownie wybrać moduły.');return}if(review)list=list.filter(q=>{let p=progress.byId[q.id];return !p||p.lastCorrect===false||p.starred});const focus=$('#learningStrategy')?.value||'all';if(mode==='learn'&&!review&&!preset&&focus!=='all'){list=list.filter(q=>focus==='due'?isDue(q):focus==='weak'?isWeak(q):focus==='starred'?!!progress.byId[q.id]?.starred:true);if(focus==='due')list.sort((a,b)=>dueTime(a)-dueTime(b));if(focus==='weak')list.sort((a,b)=>weakWeight(b)-weakWeight(a));}if(preset==='examMistakes'){
+if(!list.length){console.error('IWE: brak pytań dla modułów',chosenModules,'; przykładowe moduły w bazie:',[...new Set(questions.map(q=>q.module))]);alert('Nie znaleziono pytań dla zaznaczonych modułów. Spróbuj odświeżyć aplikację i ponownie wybrać moduły.');return}if(review)list=list.filter(q=>{let p=progress.byId[q.id];return !p||p.lastCorrect===false||p.starred});const focus=$('#learningStrategy')?.value||'all';if(mode==='learn'&&!review&&!preset&&focus!=='all'){list=list.filter(q=>focus==='due'?isDue(q):focus==='weak'?isWeak(q):focus==='starred'?!!progress.byId[q.id]?.starred:true);if(focus==='due')list.sort((a,b)=>dueTime(a)-dueTime(b));if(focus==='weak')list.sort((a,b)=>weakWeight(b)-weakWeight(a));}if(preset==='weakTop'){
+ list=questions.filter(q=>q.hasKey&&((progress.byId[q.id]?.incorrect||0)>0)).sort((a,b)=>(progress.byId[b.id]?.incorrect||0)-(progress.byId[a.id]?.incorrect||0)).slice(0,10);
+ if(!list.length){alert('Brak pytań z zapisanymi błędami.');return;}
+}
+if(preset==='examMistakes'){
  const ids=new Set(progress.lastExamMistakes||[]);
  list=questions.filter(q=>ids.has(q.id)&&q.options.length&&q.hasKey);
  if(!list.length){alert('Brak błędnych pytań z ostatniego egzaminu.');return;}
@@ -16,7 +20,7 @@ if(preset==='smart'){
  const rest=take(list,Math.max(0,target-weak.length-due.length-fresh.length));
  list=shuffle([...weak,...due,...fresh,...rest]);
 }
-if(!preset&&$('#questionOrder').value==='wrong')list.sort((a,b)=>Number(!(progress.byId[a.id]&&progress.byId[a.id].lastCorrect===false))-Number(!(progress.byId[b.id]&&progress.byId[b.id].lastCorrect===false)));else if(!preset&&$('#questionOrder').value==='random')shuffle(list);if(!list.length){alert(review?'Nie ma pytań do powtórki.':'Brak pytań dla wybranego zakresu. Wybierz co najmniej jeden moduł.');return}const n=$('#questionCount').value;session=list.slice(0,preset==='examMistakes'?list.length:n==='all'?list.length:Number(n)).map(q=>{
+if(!preset&&$('#questionOrder').value==='wrong')list.sort((a,b)=>Number(!(progress.byId[a.id]&&progress.byId[a.id].lastCorrect===false))-Number(!(progress.byId[b.id]&&progress.byId[b.id].lastCorrect===false)));else if(!preset&&$('#questionOrder').value==='random')shuffle(list);if(!list.length){alert(review?'Nie ma pytań do powtórki.':'Brak pytań dla wybranego zakresu. Wybierz co najmniej jeden moduł.');return}const n=$('#questionCount').value;session=list.slice(0,(preset==='examMistakes'||preset==='weakTop')?list.length:n==='all'?list.length:Number(n)).map(q=>{
  // Kopia pytania tylko dla bieżącej sesji: nigdy nie zmieniamy oryginalnej bazy.
  // Litery A-D odnoszą się do aktualnie wyświetlanej kolejności, a nie do Excela.
  const options=q.options.map(o=>({...o}));
@@ -56,7 +60,48 @@ function renderExamModuleSummary(){
   return '<div class="module-row"><strong>Moduł '+esc(m)+'</strong><span>'+g.points+' / '+g.maximum+' pkt · '+pct+' · '+g.correct+'/'+g.scored+' poprawnych'+(g.unknown?' · '+g.unknown+' bez klucza':'')+'</span></div>';
  }).join('')+'</div>';
 }
-function renderStats(){const all=questions.length;const solved=Object.keys(progress.byId).length;const vals=Object.values(progress.byId);const scored=vals.filter(p=>p.lastCorrect!==null&&p.lastCorrect!==undefined);const acc=scored.length?Math.round(scored.filter(p=>p.lastCorrect).length/scored.length*100):null;$('#totalCount').textContent=all;$('#seenCount').textContent=solved;$('#accuracy').textContent=acc===null?'—':`${acc}%`;$('#masteredCount').textContent=questions.filter(mastered).length;$('#progressSummary').innerHTML=`<div class="progress-box"><strong>${solved}</strong><span>różnych pytań</span></div><div class="progress-box"><strong>${progress.answered}</strong><span>odpowiedzi łącznie</span></div><div class="progress-box"><strong>${progress.sessions}</strong><span>zestawów ukończonych</span></div>`;renderLearningDashboard();$('#moduleProgress').innerHTML=MODULES.map(m=>{let total=questions.filter(q=>normalizeModule(q.module)===m&&q.hasKey).length;let done=questions.filter(q=>normalizeModule(q.module)===m&&q.hasKey&&progress.byId[q.id]).length;return `<div class="module-row"><strong>Moduł ${m}</strong><div class="bar"><span style="width:${total?done/total*100:0}%"></span></div><span>${done}/${total}</span></div>`}).join('');renderDetailedStats();renderCharts()}
+function renderReadinessDashboard(){
+ const host=$('#readinessDashboard');if(!host)return;
+ const eligible=questions.filter(q=>q.hasKey);
+ const masteredCount=eligible.filter(mastered).length;
+ const attempted=eligible.filter(q=>(progress.byId[q.id]?.attempts||0)>0).length;
+ const mastery=eligible.length?100*masteredCount/eligible.length:0;
+ const coverage=eligible.length?100*attempted/eligible.length:0;
+ const exams=(progress.examHistory||[]).filter(e=>Number.isFinite(e.pct)&&e.maximum>0);
+ const recent=exams.slice(-3);
+ const examAvg=recent.length?recent.reduce((sum,e)=>sum+e.pct,0)/recent.length:null;
+ // Model demonstracyjny: wyniki egzaminów 40%, pokrycie bazy 30%, opanowanie 30%.
+ const readiness=examAvg===null?null:Math.round(.4*Math.max(0,Math.min(100,examAvg))+.3*coverage+.3*mastery);
+ const fmt=n=>n.toLocaleString('pl-PL',{maximumFractionDigits:1});
+ const modules=MODULES.map(m=>{
+  const qs=eligible.filter(q=>normalizeModule(q.module)===m);
+  const done=qs.filter(mastered).length;
+  return {m,total:qs.length,done,pct:qs.length?100*done/qs.length:0};
+ });
+ const weak=eligible.map(q=>{
+  const p=progress.byId[q.id]||{},attempts=p.attempts||0;
+  const wrong=p.incorrect??Math.max(0,attempts-(p.correct||0)-(p.unknown||0));
+  return {q,wrong,attempts};
+ }).filter(x=>x.wrong>0).sort((a,b)=>b.wrong-a.wrong||b.attempts-a.attempts).slice(0,10);
+ const history=Array.isArray(progress.history)?progress.history:[];
+ const days=new Map();
+ for(const h of history){const day=h.date?.slice(0,10);if(day)days.set(day,(days.get(day)||0)+1)}
+ const activeDays=days.size;
+ const last7=[...days].filter(([day])=>day>=new Date(Date.now()-7*86400000).toISOString().slice(0,10)).reduce((sum,[,n])=>sum+n,0);
+ host.innerHTML='<h2>Analiza przygotowania do IWE — wersja testowa</h2>'+
+ '<div class="progress-summary"><div class="progress-box"><strong>'+(readiness===null?'—':readiness+'%')+'</strong><span>wskaźnik przygotowania</span></div>'+
+ '<div class="progress-box"><strong>'+fmt(coverage)+'%</strong><span>poznana baza pytań</span></div>'+
+ '<div class="progress-box"><strong>'+fmt(mastery)+'%</strong><span>opanowana baza</span></div>'+
+ '<div class="progress-box"><strong>'+(examAvg===null?'—':fmt(examAvg)+'%')+'</strong><span>średnia z maks. 3 ostatnich egzaminów</span></div></div>'+
+ '<p class="muted">Wskaźnik eksperymentalny: 40% wynik egzaminów (ostatnie maks. 3), 30% poznanie bazy, 30% opanowanie bazy. Nie jest prognozą zdania egzaminu ani oficjalną oceną IWE. Do wyliczenia wymagany jest przynajmniej jeden oceniony egzamin.</p>'+
+ '<h3>Opanowanie modułów</h3><div class="module-progress">'+modules.map(x=>'<div class="module-row"><strong>Moduł '+esc(x.m)+'</strong><div class="bar"><span style="width:'+x.pct+'%"></span></div><span>'+x.done+'/'+x.total+' ('+fmt(x.pct)+'%)</span></div>').join('')+'</div>'+
+ '<h3>Najczęściej błędne pytania</h3>'+(weak.length?weak.map(x=>'<div class="question-stat"><div><small>Moduł '+esc(x.q.module)+'</small><p>'+esc(x.q.question)+'</p></div><div class="question-numbers"><span>Błędne: <b>'+x.wrong+'</b></span><span>Próby: <b>'+x.attempts+'</b></span></div></div>').join(''):'<p class="muted">Brak zarejestrowanych błędnych odpowiedzi.</p>')+
+ '<button type="button" class="secondary" id="learnWeakQuestionsBtn" '+(!weak.length?'disabled':'')+'>Ćwicz najczęściej błędne pytania</button>'+
+ '<h3>Regularność nauki</h3><p>Aktywne dni w zapisanej historii: <strong>'+activeDays+'</strong> · Odpowiedzi w ostatnich 7 dniach: <strong>'+last7+'</strong></p>'+
+ '<p class="muted">Analiza regularności wykorzystuje tylko zachowane datowane odpowiedzi. Starsze postępy bez historii nie są odtwarzane.</p>';
+ $('#learnWeakQuestionsBtn').addEventListener('click',()=>startQuiz('learn',false,'weakTop'));
+}
+function renderStats(){const all=questions.length;const solved=Object.keys(progress.byId).length;const vals=Object.values(progress.byId);const scored=vals.filter(p=>p.lastCorrect!==null&&p.lastCorrect!==undefined);const acc=scored.length?Math.round(scored.filter(p=>p.lastCorrect).length/scored.length*100):null;$('#totalCount').textContent=all;$('#seenCount').textContent=solved;$('#accuracy').textContent=acc===null?'—':`${acc}%`;$('#masteredCount').textContent=questions.filter(mastered).length;$('#progressSummary').innerHTML=`<div class="progress-box"><strong>${solved}</strong><span>różnych pytań</span></div><div class="progress-box"><strong>${progress.answered}</strong><span>odpowiedzi łącznie</span></div><div class="progress-box"><strong>${progress.sessions}</strong><span>zestawów ukończonych</span></div>`;renderLearningDashboard();$('#moduleProgress').innerHTML=MODULES.map(m=>{let total=questions.filter(q=>normalizeModule(q.module)===m&&q.hasKey).length;let done=questions.filter(q=>normalizeModule(q.module)===m&&q.hasKey&&progress.byId[q.id]).length;return `<div class="module-row"><strong>Moduł ${m}</strong><div class="bar"><span style="width:${total?done/total*100:0}%"></span></div><span>${done}/${total}</span></div>`}).join('');renderDetailedStats();renderCharts();renderReadinessDashboard()}
 function renderDetailedStats(){const moduleHost=$('#detailedModules'),questionHost=$('#questionStats');if(!moduleHost||!questionHost)return;moduleHost.innerHTML=MODULES.map(m=>{const qs=questions.filter(q=>normalizeModule(q.module)===m),ps=qs.map(q=>progress.byId[q.id]).filter(Boolean),attempts=ps.reduce((a,x)=>a+(x.attempts||0),0),correct=ps.reduce((a,x)=>a+(x.correct||0),0),wrong=ps.reduce((a,x)=>a+(x.incorrect??Math.max(0,(x.attempts||0)-(x.correct||0)-(x.unknown||0))),0),unknown=ps.reduce((a,x)=>a+(x.unknown||0),0),rate=correct+wrong?Math.round(100*correct/(correct+wrong)):null;return `<div class="detail-module"><strong>Moduł ${m}</strong><span>Pytań: ${qs.length} · próby: ${attempts}</span><span>Poprawne: ${correct} · błędne: ${wrong}${unknown?' · bez klucza: '+unknown:''}</span><strong>${rate===null?'—':rate+'%'} poprawnych prób</strong></div>`}).join('');const filter=$('#statsModuleFilter')?.value||'all';const term=($('#statsSearch')?.value||'').toLocaleLowerCase('pl');const filtered=questions.filter(q=>(filter==='all'||normalizeModule(q.module)===filter)&&(!term||(q.question+' '+q.id).toLocaleLowerCase('pl').includes(term)));$('#questionStatsCount').textContent=`${filtered.length} pytań`;questionHost.innerHTML=filtered.map(q=>{const v=progress.byId[q.id]||{},attempts=v.attempts||0,correct=v.correct||0,unknown=v.unknown||0,wrong=v.incorrect??Math.max(0,attempts-correct-unknown);return `<div class="question-stat"><div><small>Moduł ${esc(q.module)} · ${esc(q.id)}</small><p>${esc(q.question)}</p></div><div class="question-numbers"><span>Próby: <b>${attempts}</b></span><span class="stat-positive">Poprawne: <b>${correct}</b></span><span class="stat-negative">Błędne: <b>${wrong}</b></span>${unknown?`<span>Bez klucza: ${unknown}</span>`:''}</div></div>`}).join('')||'<p class="muted">Nie znaleziono pytań.</p>'}
 
 function renderCharts(){

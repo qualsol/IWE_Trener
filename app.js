@@ -182,6 +182,9 @@ window.addEventListener('keydown',event=>{
  if(event.repeat||event.ctrlKey||event.altKey||event.metaKey||!$('#quiz')?.classList.contains('active'))return;
  const active=document.activeElement;
  if(active&&(active.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(active.tagName)))return;
+ if((event.code==='Space'||event.key===' '||event.key==='Spacebar')&&mode==='learn'){
+  event.preventDefault();toggleStar();return;
+ }
  if(/^[1-4]$/.test(event.key)){
   const letter='ABCD'[Number(event.key)-1];
   const button=[...document.querySelectorAll('#options .option')].find(b=>b.dataset.letter===letter);

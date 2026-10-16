@@ -18,3 +18,15 @@
 - Dla kolejnej aktualizacji podmień pliki w repozytorium. Aby wymusić aktualizację offline, zwiększ wersję `CACHE` w `sw.js`.
 - Nie jest potrzebny backend ani płatny hosting. W trybie lokalnym `index.html` nadal działa, ale funkcje instalacji/offline PWA wymagają HTTPS (np. GitHub Pages).
 - Przed pierwszym użyciem offline otwórz opublikowaną stronę online, poczekaj na załadowanie i przetestuj ją w trybie samolotowym.
+
+## Zmiana układu
+Sekcja kopii zapasowej JSON znajduje się na przedostatniej pozycji strony głównej, a import Excel na samym dole. Nie zmieniono funkcji aplikacji. Zwiększono wersję cache PWA do v2.
+
+Aktualizacja układu: „Zakres nauki” znajduje się bezpośrednio przed „Plan nauki i opanowanie materiału”.
+
+## Aktualizacja nagłówka
+Nagłówek pokazuje liczbę pytań opanowanych na podstawie istniejących zasad inteligentnych powtórek.
+
+
+## Korekta klucza odpowiedzi
+Ponowny import XLSX zachowuje identyfikator pytania przy zmianie klucza (treść, moduł i opcje bez zmian). Resetuje wyłącznie bieżący postęp nauki zmienionego pytania, zachowując historię egzaminów. Duplikaty dopasowywane są według kolejności w arkuszu. Przed aktualizacją zalecany eksport kopii JSON.

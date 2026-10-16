@@ -1,4 +1,4 @@
-const CACHE='iwe-trener-online-v1';
+const CACHE='iwe-trener-online-v5';
 const FILES=['./','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('iwe-trener-online-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

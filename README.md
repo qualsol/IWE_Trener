@@ -1,19 +1,20 @@
-# IWE Trener v10 — inteligentna nauka
+# IWE Trener Online — publikacja GitHub Pages
 
-Rozpakuj ZIP i otwórz `index.html` w Chrome lub Edge. Wszystko działa offline, bez serwera.
+## Jak opublikować
 
-Nowe funkcje:
-- inteligentne powtórki: po poprawnej odpowiedzi termin następnej powtórki po 1, 3, 7, 14, 30, 60 lub 90 dniach, po błędnej — następnego dnia;
-- pytanie opanowane: minimum 3 poprawne odpowiedzi z rzędu w co najmniej 2 różnych dniach;
-- tryb słabych punktów i tryb pytań oznaczonych jako trudne;
-- egzamin z opcjonalnym zegarem 15–120 min, bez podpowiedzi podczas egzaminu, automatycznie kończony po czasie;
-- przycisk oznaczania trudnych pytań;
-- mapa opanowania wszystkich 8 modułów;
-- wyjaśnienia pobierane z arkusza Excel, jeśli są w nim wpisane (bez automatycznego wymyślania uzasadnień);
-- eksport i import kopii zapasowej JSON z wynikami, historią, harmonogramem powtórek i bazą zaimportowaną z Excel;
-- zachowany import całego Excela (również powtórzenia pytań), losowanie odpowiedzi, punktacja +2/-1, próg 60% i wykresy.
+1. Zaloguj się na https://github.com i utwórz **publiczne** repozytorium, np. `iwe-trener`.
+2. Kliknij **Add file → Upload files** i prześlij pliki z **wnętrza** tego folderu (w szczególności `index.html`, `sw.js`, `manifest.json`, ikony i `.nojekyll`). Nie przesyłaj samego archiwum ZIP jako strony.
+3. Zatwierdź **Commit changes**.
+4. W repozytorium wybierz **Settings → Pages → Build and deployment → Deploy from a branch**, branch `main`, folder `/ (root)`, **Save**.
+5. Poczekaj na publikację. Adres będzie podobny do `https://TWOJ-LOGIN.github.io/iwe-trener/`.
+6. Otwórz adres w Chrome/Edge. Po pierwszym pełnym wczytaniu aplikacja może działać również bez internetu dzięki service workerowi.
+7. Na Androidzie w menu Chrome wybierz **Dodaj do ekranu głównego** lub **Zainstaluj aplikację** (jeżeli dostępne).
 
-Przed przywróceniem kopii zapasowej zaleca się wyeksportowanie aktualnych danych. W przypadku plików lokalnych dostęp do localStorage może zależeć od przeglądarki i ścieżki pliku.
+## Ważne
 
-## Wersja 10.1
-Dodano opcję 80 pytań (egzamin IWE) w polu „Liczba pytań w zestawie”. Działa w nauce i egzaminie. Jeśli wybrane moduły lub filtry zawierają mniej niż 80 pytań, używane są wszystkie dostępne.
+- Strona zawiera wbudowaną bazę pytań i jest publiczna. Publikuj ją tylko jeśli masz prawo do udostępnienia treści pytań.
+- Arkusz `TESTY DO IWE.xlsx` nie jest celowo dołączony do publicznej paczki. Możesz go zaimportować przez przycisk **Importuj Excel**; plik pozostaje na Twoim urządzeniu.
+- Wyniki, importowana baza i statystyki pozostają w pamięci przeglądarki danego urządzenia. Nie ma automatycznej synchronizacji między urządzeniami. Używaj kopii zapasowej JSON.
+- Dla kolejnej aktualizacji podmień pliki w repozytorium. Aby wymusić aktualizację offline, zwiększ wersję `CACHE` w `sw.js`.
+- Nie jest potrzebny backend ani płatny hosting. W trybie lokalnym `index.html` nadal działa, ale funkcje instalacji/offline PWA wymagają HTTPS (np. GitHub Pages).
+- Przed pierwszym użyciem offline otwórz opublikowaną stronę online, poczekaj na załadowanie i przetestuj ją w trybie samolotowym.

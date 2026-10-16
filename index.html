@@ -33,7 +33,7 @@ if(preset==='smart'){
  const rest=take(list,Math.max(0,target-weak.length-due.length-fresh.length));
  list=shuffle([...weak,...due,...fresh,...rest]);
 }
-if(preset!=='smart'&&preset!=='mistakes'&&($('#questionOrder').value==='wrong')list.sort((a,b)=>Number(!(progress.byId[a.id]&&progress.byId[a.id].lastCorrect===false))-Number(!(progress.byId[b.id]&&progress.byId[b.id].lastCorrect===false)));else if($('#questionOrder').value==='random')shuffle(list);if(!list.length){alert(review?'Nie ma pytań do powtórki.':'Brak pytań dla wybranego zakresu. Wybierz co najmniej jeden moduł.');return}const n=$('#questionCount').value;session=list.slice(0,n==='all'?list.length:Number(n)).map(q=>{
+if(preset!=='smart'&&preset!=='mistakes'&&$('#questionOrder').value==='wrong')list.sort((a,b)=>Number(!(progress.byId[a.id]&&progress.byId[a.id].lastCorrect===false))-Number(!(progress.byId[b.id]&&progress.byId[b.id].lastCorrect===false)));else if(preset!=='smart'&&preset!=='mistakes'&&$('#questionOrder').value==='random')shuffle(list);if(!list.length){alert(review?'Nie ma pytań do powtórki.':'Brak pytań dla wybranego zakresu. Wybierz co najmniej jeden moduł.');return}const n=$('#questionCount').value;session=list.slice(0,n==='all'?list.length:Number(n)).map(q=>{
  // Kopia pytania tylko dla bieżącej sesji: nigdy nie zmieniamy oryginalnej bazy.
  // Litery A-D odnoszą się do aktualnie wyświetlanej kolejności, a nie do Excela.
  const options=q.options.map(o=>({...o}));

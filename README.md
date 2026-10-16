@@ -30,3 +30,10 @@ Nagłówek pokazuje liczbę pytań opanowanych na podstawie istniejących zasad 
 
 ## Korekta klucza odpowiedzi
 Ponowny import XLSX zachowuje identyfikator pytania przy zmianie klucza (treść, moduł i opcje bez zmian). Resetuje wyłącznie bieżący postęp nauki zmienionego pytania, zachowując historię egzaminów. Duplikaty dopasowywane są według kolejności w arkuszu. Przed aktualizacją zalecany eksport kopii JSON.
+
+
+## Plan wdrożeń
+- Etap 1: inteligentne zestawy i szybkie powtarzanie błędów.
+- Etap 2: realistyczny egzamin 80 pytań i raport.
+- Etap 3: bezpieczne aktualizacje i historia wersji.
+- Etap 4: synchronizacja między urządzeniami (wymaga zewnętrznej usługi).

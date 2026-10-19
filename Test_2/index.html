@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IWE Trener 2.0 — Test_2</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color-scheme:light}body{margin:0;background:#f4f7fb;color:#17243b}header{background:#123a65;color:white;padding:22px max(20px,calc((100vw - 920px)/2))}main{max-width:920px;margin:24px auto;padding:0 18px}.card{background:white;border:1px solid #dbe3ec;border-radius:12px;padding:20px;margin:16px 0;box-shadow:0 2px 12px #123a6510}h1{margin:0;font-size:1.7rem}h2{margin-top:0}button{border:0;background:#1769aa;color:white;padding:12px 16px;border-radius:8px;cursor:pointer;font-size:1rem}button:disabled{opacity:.5}code{background:#edf2f8;padding:3px 5px;border-radius:4px}.muted{color:#52627a}.stat{display:inline-block;margin:8px 20px 8px 0}strong{font-size:1.1rem}#output{white-space:pre-wrap;word-break:break-word;font-size:.9rem}a{color:#125d9e}</style></head>
+<body><header><h1>IWE Trener 2.0 — środowisko testowe</h1><p>Osobna wersja rozwojowa. Nie zmienia historii IWE Trener 1.x.</p></header>
+<main><section class="card"><h2>Stan projektu</h2><p>Etap 1: model pytań, odpowiedzi i wyliczanie statystyk. To demonstrator silnika, a nie pełna aplikacja do nauki.</p><p class="muted">Historia z wersji 1 pozostaje archiwalna. Tutaj zaczynamy od zera.</p></section>
+<section class="card"><h2>Test nowego silnika</h2><p>Przykładowe pytanie wielokrotnego wyboru. Poprawne warianty: A i C.</p>
+<label><input type="checkbox" value="A" class="opt"> A — wariant testowy</label><br>
+<label><input type="checkbox" value="B" class="opt"> B — wariant testowy</label><br>
+<label><input type="checkbox" value="C" class="opt"> C — wariant testowy</label><br><br>
+<button id="answer">Sprawdź odpowiedź w silniku v2</button>
+<p id="result" role="status"></p><div><span class="stat">Odpowiedzi w demonstratorze: <strong id="answered">0</strong></span><span class="stat">Poprawne: <strong id="correct">0</strong></span></div>
+<p class="muted">Demonstrator przechowuje wyniki tylko w pamięci bieżącej karty. Odświeżenie zeruje licznik. Trwały zapis IndexedDB i synchronizacja będą dodane w kolejnych etapach.</p></section>
+<section class="card"><h2>Diagnostyka</h2><button id="selftest">Uruchom testy silnika</button><pre id="output" role="status"></pre></section>
+<section class="card"><h2>Repozytorium</h2><p><a href="https://github.com/qualsol/IWE_Trener/tree/main/Test_2">Pliki środowiska Test_2</a> · <a href="https://github.com/qualsol/IWE_Trener/tree/iwe-trener-v2">Gałąź rozwojowa v2</a></p></section></main>
+<script type="module">
+import {assertQuestion,makeAnswerEvent,mergeEvents,calculateStats} from './core.mjs';
+const question={questionId:'demo-welding-001',revisionId:'v1',options:[{optionId:'A'},{optionId:'B'},{optionId:'C'}],correctOptionIds:['A','C']};
+const events=[];const deviceId=crypto.randomUUID();const sessionId=crypto.randomUUID();
+document.querySelector('#answer').addEventListener('click',()=>{
+ try{const selectedOptionIds=[...document.querySelectorAll('.opt:checked')].map(e=>e.value);
+ const event=makeAnswerEvent({question,selectedOptionIds,sessionId,mode:'demo',deviceId});
+ events.push(event);const stats=calculateStats(events);
+ document.querySelector('#result').textContent=event.correct?'Odpowiedź poprawna. Zdarzenie '+event.eventId:'Odpowiedź niepoprawna. Zdarzenie '+event.eventId;
+ document.querySelector('#answered').textContent=stats.answered;document.querySelector('#correct').textContent=stats.correct;
+ }catch(e){document.querySelector('#result').textContent='Błąd: '+e.message}
+});
+document.querySelector('#selftest').addEventListener('click',()=>{
+ const tests=[];const check=(name,fn)=>{try{if(!fn())throw Error('niezgodny wynik');tests.push('OK: '+name)}catch(e){tests.push('BŁĄD: '+name+' — '+e.message)}};
+ check('Walidacja pytania',()=>assertQuestion(question));
+ check('Wiele poprawnych odpowiedzi',()=>makeAnswerEvent({question,selectedOptionIds:['C','A'],sessionId,mode:'demo',deviceId}).correct);
+ check('Niepełna odpowiedź niepoprawna',()=>!makeAnswerEvent({question,selectedOptionIds:['A'],sessionId,mode:'demo',deviceId}).correct);
+ check('Deduplication eventId',()=>{const e=makeAnswerEvent({question,selectedOptionIds:['A','C'],sessionId,mode:'demo',deviceId});return mergeEvents([e],[e]).length===1});
+ check('Statystyki ze zdarzeń',()=>{const e=makeAnswerEvent({question,selectedOptionIds:['A','C'],sessionId,mode:'demo',deviceId});return calculateStats([e]).correct===1});
+ document.querySelector('#output').textContent=tests.join('\n');
+});
+</script></body></html>

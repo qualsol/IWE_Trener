@@ -446,6 +446,49 @@ setInterval(()=>{flushEvents().then(mergeCloudEvents)},30000);
 
 
 /* Łączenie wyłącznie zdarzeń z UUID, bez automatycznego odtwarzania snapshotów. */
+
+// Deterministyczne odtworzenie stanu z kompletnej historii odpowiedzi.
+// Starsze kopie zawierają pełną historię, ale nie wszystkie wpisy mają UUID.
+function reconcileAnswerHistory(state){
+ const history=state.history||[];
+ const countById={};
+ for(const item of history)countById[item.id]=(countById[item.id]||0)+1;
+ // Jeśli brakuje części historii, nie niszczymy starszych liczników.
+ for(const [id,p] of Object.entries(state.byId||{})){
+  if((p.attempts||0)!==(countById[id]||0))return {state,reason:'Historia odpowiedzi jest niepełna — nie zmieniono statystyk.'};
+ }
+ const byId={};
+ for(const [id,p] of Object.entries(state.byId||{})){
+  byId[id]={...p,attempts:0,correct:0,incorrect:0,unknown:0,streak:0,reviewDays:[],lastCorrect:null};
+  delete byId[id].nextReview;
+ }
+ const ordered=history.map((item,i)=>({item,i})).sort((a,b)=>
+  String(a.item.date).localeCompare(String(b.item.date))||a.i-b.i);
+ const delays=[1,3,7,14,30,60,90];
+ for(const {item} of ordered){
+  if(!item.id)continue;
+  const p=byId[item.id]||{attempts:0,correct:0,incorrect:0,unknown:0,streak:0,reviewDays:[],starred:false};
+  p.attempts++;
+  if(item.correct===true)p.correct++;
+  else if(item.correct===false)p.incorrect++;
+  else p.unknown++;
+  p.lastCorrect=item.correct===true;
+  p.module=item.module||p.module;
+  const t=Date.parse(item.date);
+  if(Number.isFinite(t)){
+   if(item.correct===true){
+    p.streak++;
+    p.reviewDays=[...new Set([...(p.reviewDays||[]),new Date(t).toISOString().slice(0,10)])].slice(-30);
+    p.nextReview=new Date(t+delays[Math.min(p.streak-1,delays.length-1)]*86400000).toISOString();
+   }else{
+    p.streak=0;
+    p.nextReview=new Date(t+86400000).toISOString();
+   }
+  }
+  byId[item.id]=p;
+ }
+ return {state:{...state,byId,answered:history.length,perfect:history.filter(x=>x.correct===true).length},reason:null};
+}
 let mergingCloud=false;
 async function mergeCloudEvents(){
  if(mergingCloud||syncingEvents||!navigator.onLine)return;
@@ -474,7 +517,15 @@ async function mergeCloudEvents(){
   current.examHistory ||= [];
   const known=new Set([...current.history,...current.examHistory].map(x=>x.eventId).filter(Boolean));
   const additions=incoming.filter(x=>!known.has(x.event_id)&&x.payload?.eventId===x.event_id);
-  if(!additions.length){return;}
+  if(!additions.length){
+   const fixed=reconcileAnswerHistory(current);
+   if(fixed.reason){syncStatus.textContent=fixed.reason;return;}
+   if(JSON.stringify(fixed.state.byId)===JSON.stringify(current.byId))return;
+   if(raw!==null)localStorage.setItem('iweTrainerTestBeforeReconcile_'+Date.now(),raw);
+   localStorage.setItem(PROGRESS_KEY,JSON.stringify(fixed.state));
+   syncStatus.textContent='Ujednolicono statystyki pytań z pełnej historii. Odśwież aplikację.';
+   return;
+  }
   const next=structuredClone(current);
   const seen=eventSeen();
   let mergedCount=0;
@@ -491,47 +542,13 @@ async function mergeCloudEvents(){
    seen.add(event.event_id);
   }
   if(!mergedCount)return;
-  // Zachowaj statystyki historyczne, których nie da się odtworzyć ze starych wpisów bez UUID.
-  // Liczniki bazowe = istniejące liczniki pomniejszone o zdarzenia UUID już w historii.
-  const oldUuid=current.history.filter(x=>x.eventId);
-  const baseById=structuredClone(current.byId);
-  for(const entry of oldUuid){
-   const p=baseById[entry.id];
-   if(!p)continue;
-   p.attempts=Math.max(0,(p.attempts||0)-1);
-   if(entry.correct===true)p.correct=Math.max(0,(p.correct||0)-1);
-   if(entry.correct===false)p.incorrect=Math.max(0,(p.incorrect||0)-1);
-   if(entry.correct===null)p.unknown=Math.max(0,(p.unknown||0)-1);
-  }
-  next.byId=baseById;
-  const ordered=[...next.history].filter(x=>x.eventId).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.eventId).localeCompare(String(b.eventId)));
-  const schedule=(p,correct,date)=>{
-   const t=Date.parse(date);
-   if(!Number.isFinite(t))return;
-   const today=new Date(t).toISOString().slice(0,10);
-   if(correct===true){
-    p.streak=(p.streak||0)+1;
-    p.reviewDays=[...new Set([...(p.reviewDays||[]),today])].slice(-30);
-    const delays=[1,3,7,14,30,60,90];
-    p.nextReview=new Date(t+delays[Math.min(p.streak-1,delays.length-1)]*86400000).toISOString();
-   }else{p.streak=0;p.nextReview=new Date(t+86400000).toISOString()}
-  };
-  for(const item of ordered){
-   const p=next.byId[item.id]||{attempts:0,correct:0,starred:false};
-   p.attempts=(p.attempts||0)+1;
-   if(item.correct===true)p.correct=(p.correct||0)+1;
-   if(item.correct===false)p.incorrect=(p.incorrect||0)+1;
-   if(item.correct===null)p.unknown=(p.unknown||0)+1;
-   p.module=item.module;
-   p.lastCorrect=item.correct===true;
-   schedule(p,item.correct,item.date);
-   next.byId[item.id]=p;
-  }
-  const newAnswers=next.history.filter(x=>x.eventId).length-oldUuid.length;
-  next.answered=(current.answered||0)+newAnswers;
-  next.perfect=(current.perfect||0)+additions.filter(x=>x.event_type==='answer'&&x.payload.correct===true).length;
+  // Ukończone zestawy nie są rekonstruowane z odpowiedzi.
+  // Dopóki nie zapisujemy zdarzeń zakończenia każdej sesji, licznik pozostaje lokalny.
   next.sessions=(current.sessions||0)+additions.filter(x=>x.event_type==='exam').length;
   next.history.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const rebuilt=reconcileAnswerHistory(next);
+  if(rebuilt.reason){syncStatus.textContent=rebuilt.reason;return;}
+  Object.assign(next,rebuilt.state);
   next.examHistory.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   if(JSON.stringify(next)===JSON.stringify(current))return;
   // Zapis kopii przed podmianą; przy błędzie nie usuwamy istniejących danych.

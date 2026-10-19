@@ -500,13 +500,13 @@ setInterval(()=>{flushEvents().then(mergeCloudEvents)},30000);
 
 // Deterministyczne odtworzenie stanu z kompletnej historii odpowiedzi.
 // Starsze kopie zawierają pełną historię, ale nie wszystkie wpisy mają UUID.
-function reconcileAnswerHistory(state){
+function reconcileAnswerHistory(state,validateExisting=true){
  const history=state.history||[];
  const countById={};
  for(const item of history)countById[item.id]=(countById[item.id]||0)+1;
  // Jeśli brakuje części historii, nie niszczymy starszych liczników.
  for(const [id,p] of Object.entries(state.byId||{})){
-  if((p.attempts||0)!==(countById[id]||0))return {state,reason:'Historia odpowiedzi jest niepełna — nie zmieniono statystyk.'};
+  if(validateExisting&&(p.attempts||0)!==(countById[id]||0))return {state,reason:'Historia odpowiedzi jest niepełna — nie zmieniono statystyk.'};
  }
  const byId={};
  for(const [id,p] of Object.entries(state.byId||{})){
@@ -578,6 +578,8 @@ async function mergeCloudEvents(){
     location.reload();
    return;
   }
+  const validation=reconcileAnswerHistory(current);
+  if(validation.reason){syncStatus.textContent=validation.reason+' Zachowano dane lokalne.';return;}
   const next=structuredClone(current);
   const seen=eventSeen();
   let mergedCount=0;
@@ -596,9 +598,9 @@ async function mergeCloudEvents(){
   if(!mergedCount)return;
   // Ukończone zestawy nie są rekonstruowane z odpowiedzi.
   // Dopóki nie zapisujemy zdarzeń zakończenia każdej sesji, licznik pozostaje lokalny.
-  next.sessions=(current.sessions||0)+additions.filter(x=>x.event_type==='exam').length;
+  next.sessions=(current.sessions||0)+additions.filter(x=>x.event_type==='exam'&&x.payload?.date&&Number.isFinite(x.payload?.points)&&Number.isFinite(x.payload?.maximum)).length;
   next.history.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  const rebuilt=reconcileAnswerHistory(next);
+  const rebuilt=reconcileAnswerHistory(next,false);
   if(rebuilt.reason){syncStatus.textContent=rebuilt.reason;return;}
   Object.assign(next,rebuilt.state);
   next.examHistory.sort((a,b)=>String(a.date).localeCompare(String(b.date)));

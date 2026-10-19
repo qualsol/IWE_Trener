@@ -169,14 +169,11 @@ function setupModules(){const modules=MODULES;const host=$('#moduleChoices');if(
 const IMPORT_STORE='iweTrainerTest3ExcelImportV1';
 function hashText(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
 function questionFingerprint(q){return JSON.stringify([normalizeModule(q.module),q.question.trim(),q.options.map(o=>[o.letter,o.text.trim(),o.correct])])}
+function questionIdentity(q){return JSON.stringify([normalizeModule(q.module),String(q.question||'').trim().replace(/\\s+/g,' '),q.options.map(o=>[o.letter,String(o.text||'').trim().replace(/\\s+/g,' ')])])}
 function idForQuestion(q,legacyMap,occurrence){
- const fp=questionFingerprint(q);
- const index=occurrence.get(fp)||0;
- occurrence.set(fp,index+1);
- // Każde wystąpienie jest osobnym pytaniem, również przy identycznym tekście i kluczu.
- // Pierwsze wystąpienie zachowuje historyczny identyfikator.
- const base=legacyMap.get(fp)||('excel_'+hashText(fp));
- return index===0?base:String(base)+'_powt_'+(index+1);
+ const identity=questionIdentity(q),index=occurrence.get(identity)||0;occurrence.set(identity,index+1);
+ const previous=legacyMap.get(identity)||[];
+ return previous[index]||('excel_'+hashText(identity)+(index?'_powt_'+(index+1):''));
 }
 const IMPORT_DB='iweTrainerTest3DatabaseV1';
 function importDb(){return new Promise((resolve,reject)=>{if(!('indexedDB'in window)){reject(Error('IndexedDB niedostępna'));return}const req=indexedDB.open(IMPORT_DB,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('data'))req.result.createObjectStore('data')};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||Error('Nie można otworzyć IndexedDB'))})}
@@ -234,7 +231,7 @@ async function parseExcel(file){
  items.push({module,question:raw.replace(/^\s*\d+\s*[.)]\s*/,''),sourceNumber:(raw.match(/^\s*(\d+)/)||[])[1]||String(items.length+1),options,explanation:String(r[7]||'').trim(),hasKey:options.some(o=>o.correct)});
  }
  if(!items.length)throw Error('Nie znaleziono pytań. Sprawdź strukturę arkusza: moduł B, klucz C, treść D, znacznik pytania H.');
- const legacyMap=new Map(questions.map(q=>[questionFingerprint(q),q.id]));
+ const legacyMap=new Map();for(const old of questions){const key=questionIdentity(old);if(!legacyMap.has(key))legacyMap.set(key,[]);legacyMap.get(key).push(old.id)}
  const occurrence=new Map();
  for(const q of items)q.id=idForQuestion(q,legacyMap,occurrence);
  // Identyczne pytania z arkusza są zachowane, ale otrzymują osobne identyfikatory.
@@ -276,14 +273,20 @@ function startExamTimer(){if(mode!=='exam')return;const mins=Number($('#examMinu
 function downloadJson(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 async function exportBackup(){const imported=activeImported||await readImportedDb().catch(()=>null);downloadJson('IWE_Trener_kopia_'+new Date().toISOString().slice(0,10)+'.json',{format:'IWE-Trener-backup',version:2,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),progress,imported});updateBackupMeta({lastExportAt:new Date().toISOString()})}
 async function restoreBackup(file){if(!file)return;try{
- const obj=JSON.parse(await file.text());const restored=validateBackup(obj);
+ const obj=JSON.parse(await file.text()),restored=validateBackup(obj);
  if(!confirm('Przywrócić dane z kopii? Aktualne postępy i importowana baza zostaną zastąpione. Przed kontynuowaniem zalecamy pobrać kopię obecnych danych.'))return;
  const oldProgress=localStorage.getItem(STORE),oldImport=localStorage.getItem(IMPORT_STORE);
+ const oldDb=await readImportedDb();
+ let dbChanged=false;
  try{
+  await writeImportedDb(obj.imported||null);dbChanged=true;
   localStorage.setItem(STORE,JSON.stringify(restored));
-  await writeImportedDb(obj.imported||null);localStorage.removeItem(IMPORT_STORE);
+  localStorage.removeItem(IMPORT_STORE);
  }catch(e){
-  try{if(oldProgress===null)localStorage.removeItem(STORE);else localStorage.setItem(STORE,oldProgress);if(oldImport===null)localStorage.removeItem(IMPORT_STORE);else localStorage.setItem(IMPORT_STORE,oldImport)}catch(rollbackError){console.error('Nie udało się cofnąć przywracania',rollbackError)}
+  const errors=[];
+  if(dbChanged){try{await writeImportedDb(oldDb)}catch(err){errors.push('IndexedDB: '+err.message)}}
+  try{if(oldProgress===null)localStorage.removeItem(STORE);else localStorage.setItem(STORE,oldProgress);if(oldImport===null)localStorage.removeItem(IMPORT_STORE);else localStorage.setItem(IMPORT_STORE,oldImport)}catch(err){errors.push('localStorage: '+err.message)}
+  if(errors.length)throw Error('Przywracanie nie powiodło się; nie udało się w pełni cofnąć zmian ('+errors.join('; ')+'). Zachowaj kopię danych. Pierwotny błąd: '+e.message);
   throw e;
  }
  progress=restored;progress.history||=[];progress.examHistory||=[];

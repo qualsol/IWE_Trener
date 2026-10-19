@@ -1,4 +1,4 @@
-const CACHE='iwe-trener-test3-v5';
+const CACHE='iwe-trener-test3-v6';
 const FILES=['./','./index.html','./manifest.json','./icon.svg','./questions-data.js','./app.js','./data-model.js','./style.css'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('iwe-trener-test3-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

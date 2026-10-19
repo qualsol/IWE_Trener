@@ -19,6 +19,14 @@ export async function getEvents(){
  try{return await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
  finally{db.close()}
 }
+// PostgreSQL jsonb nie zachowuje kolejności kluczy JSON. Porównuj strukturę,
+// nie wynik JSON.stringify z kolejnością pól.
+function canonical(value){
+ if(Array.isArray(value))return value.map(canonical);
+ if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])]));
+ return value;
+}
+function sameEvent(a,b){return JSON.stringify(canonical(a))===JSON.stringify(canonical(b))}
 export async function putEvents(events){
  const db=await openEventDB();
  try{
@@ -27,9 +35,9 @@ export async function putEvents(events){
   for(const event of events){
    if(!event.eventId||!event.occurredAt)throw Error('Niepoprawne zdarzenie');
    const prev=known.get(event.eventId);
-   if(prev&&JSON.stringify(prev)!==JSON.stringify(event))throw Error('Konflikt identyfikatora '+event.eventId);
+   if(prev&&!sameEvent(prev,event))throw Error('Konflikt danych dla identyfikatora '+event.eventId);
   }
-  return await transaction(db,'readwrite',store=>{for(const event of events)store.put(event);return events.length});
+  return await transaction(db,'readwrite',store=>{for(const event of events)if(!known.has(event.eventId))store.add(event);return events.length});
  }finally{db.close()}
 }
 export async function syncEvents(client,onStatus=()=>{}){

@@ -65,7 +65,7 @@ progress.history.push({eventId:crypto.randomUUID(),date:new Date().toISOString()
 saveProgress()}function goNext(){if(mode==='exam'){if(index<session.length-1){index++;renderQuestion()}else finishExamWithConfirmation();return}if(index<session.length-1){index++;renderQuestion()}else finishQuiz()}function finishQuiz(){stopExamTimer();if(mode==='exam'){for(let i=0;i<session.length;i++){if(!results[i]){results[i]={q:session[i],chosen:[...(answers[i]||[])],correct:isCorrect(session[i],answers[i]||[])};bumpProgress(session[i],results[i].correct)}}}progress.lastMistakes=results.filter(r=>r&&r.correct===false).map(r=>r.q.id);if(mode==='exam')progress.lastExamMistakes=[...progress.lastMistakes];progress.sessions++;
 if(mode==='exam'){const scored=results.filter(r=>r&&r.q.hasKey);const points=scored.reduce((a,r)=>a+scoreAnswer(r.q,r.chosen),0);const maximum=scored.reduce((a,r)=>a+maxScore(r.q),0);
 progress.examHistory.push({eventId:crypto.randomUUID(),date:new Date().toISOString(),points,maximum,pct:maximum?points/maximum*100:null,questions:scored.length});}
-saveProgress();renderResults();switchScreen('results')}function renderResults(){const scored=results.filter(r=>r&&r.correct!==null);const good=scored.filter(r=>r.correct===true).length;const pct=scored.length?Math.round(good/scored.length*100):0;const points=scored.reduce((sum,r)=>sum+scoreAnswer(r.q,r.chosen),0);const maximum=scored.reduce((sum,r)=>sum+maxScore(r.q),0);const pointsPct=maximum>0?points/maximum*100:null;const pointsPctLabel=pointsPct===null?'—':pointsPct.toLocaleString('pl-PL',{maximumFractionDigits:1})+'%';const passed=pointsPct!==null&&pointsPct>=PASS_THRESHOLD;const passLabel=pointsPct===null?'BRAK OCENY':passed?'ZALICZONY':'NIEZALICZONY';$('#resultTitle').textContent=mode==='exam'?'Egzamin zakończony':'Nauka zakończona';$('#resultScore').textContent=pointsPctLabel;$('#passStatus').textContent=passLabel+' · próg '+PASS_THRESHOLD+'%';$('#passStatus').className='pass-status '+(pointsPct===null?'':passed?'passed':'failed');$('#resultText').textContent=`Wynik punktowy: ${points} / ${maximum} pkt (${pointsPctLabel} możliwych punktów). Poprawne komplety odpowiedzi: ${good} z ${scored.length} (${pct}%). ${results.length-scored.length} pytań bez klucza nie podlega punktacji. Wynik punktowy i procentowy mogą być ujemne.`;$('#resultStats').innerHTML=`<div class="progress-box"><strong>${pointsPctLabel}<\/strong><span>procent maks. punktów<\/span><\/div><div class="progress-box"><strong>${points}<\/strong><span>zdobyte punkty<\/span><\/div><div class="progress-box"><strong>${maximum}<\/strong><span>maks. punktów<\/span><\/div><div class="progress-box"><strong>${good}/${scored.length}<\/strong><span>całkowicie poprawnych<\/span><\/div>`;renderExamModuleSummary();
+saveProgress();renderResults();switchScreen('results');window.dispatchEvent(new Event('iwe-test-session-finished'))}function renderResults(){const scored=results.filter(r=>r&&r.correct!==null);const good=scored.filter(r=>r.correct===true).length;const pct=scored.length?Math.round(good/scored.length*100):0;const points=scored.reduce((sum,r)=>sum+scoreAnswer(r.q,r.chosen),0);const maximum=scored.reduce((sum,r)=>sum+maxScore(r.q),0);const pointsPct=maximum>0?points/maximum*100:null;const pointsPctLabel=pointsPct===null?'—':pointsPct.toLocaleString('pl-PL',{maximumFractionDigits:1})+'%';const passed=pointsPct!==null&&pointsPct>=PASS_THRESHOLD;const passLabel=pointsPct===null?'BRAK OCENY':passed?'ZALICZONY':'NIEZALICZONY';$('#resultTitle').textContent=mode==='exam'?'Egzamin zakończony':'Nauka zakończona';$('#resultScore').textContent=pointsPctLabel;$('#passStatus').textContent=passLabel+' · próg '+PASS_THRESHOLD+'%';$('#passStatus').className='pass-status '+(pointsPct===null?'':passed?'passed':'failed');$('#resultText').textContent=`Wynik punktowy: ${points} / ${maximum} pkt (${pointsPctLabel} możliwych punktów). Poprawne komplety odpowiedzi: ${good} z ${scored.length} (${pct}%). ${results.length-scored.length} pytań bez klucza nie podlega punktacji. Wynik punktowy i procentowy mogą być ujemne.`;$('#resultStats').innerHTML=`<div class="progress-box"><strong>${pointsPctLabel}<\/strong><span>procent maks. punktów<\/span><\/div><div class="progress-box"><strong>${points}<\/strong><span>zdobyte punkty<\/span><\/div><div class="progress-box"><strong>${maximum}<\/strong><span>maks. punktów<\/span><\/div><div class="progress-box"><strong>${good}/${scored.length}<\/strong><span>całkowicie poprawnych<\/span><\/div>`;renderExamModuleSummary();
  const examMistakesBtn=$('#learnExamMistakesBtn');
  if(examMistakesBtn){examMistakesBtn.classList.toggle('hidden',mode!=='exam'||!results.some(r=>r.correct===false));}
  $('#reviewList').innerHTML=results.map((r,i)=>`<div class="review-item"><strong>${i+1}. ${esc(r.q.question)}<\/strong><small class="${r.correct===true?'right':r.correct===false?'wrong':''}">${r.correct===true?'Poprawnie':r.correct===false?'Nie w pełni poprawnie':'Brak klucza'} · ${r.q.hasKey?`Punkty: ${scoreAnswer(r.q,r.chosen)} / ${maxScore(r.q)} · `:''}Twoja odpowiedź: ${r.chosen.length?r.chosen.join(', '):'brak'}${r.q.hasKey?' · Klucz: '+r.q.options.filter(o=>o.correct).map(o=>o.letter).join(', '):''}<\/small><\/div>`).join('');}
@@ -485,13 +485,14 @@ async function flushEvents(){
    queue=queue.filter(x=>x.event_id!==entry.event_id);
    localStorage.setItem(EVENT_QUEUE_KEY,JSON.stringify(queue));
   }
-  if(status&&!queue.length)syncStatus.textContent='Nowe zdarzenia nauki zapisane w chmurze. Łączenie historii między urządzeniami będzie dostępne w kolejnym kroku.';
+  if(!queue.length)syncStatus.textContent='Zdarzenia nauki zapisane w chmurze. Sprawdzanie zmian na innych urządzeniach…';
  }catch(e){console.warn('Synchronizacja zdarzeń:',e);syncStatus.textContent='Oczekujące zdarzenia: '+eventQueue().length+'. '+e.message;}
  finally{syncingEvents=false;}
 }
 window.addEventListener('iwe-test-progress-saved',()=>{captureEvents();flushEvents()});
+window.addEventListener('iwe-test-session-finished',()=>{flushEvents().then(mergeCloudEvents)});
 window.addEventListener('online',()=>{flushEvents().then(mergeCloudEvents)});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)flushEvents()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)flushEvents().then(mergeCloudEvents)});
 setInterval(()=>{flushEvents().then(mergeCloudEvents)},30000);
 
 
@@ -573,7 +574,8 @@ async function mergeCloudEvents(){
    if(JSON.stringify(fixed.state.byId)===JSON.stringify(current.byId))return;
    if(raw!==null)localStorage.setItem('iweTrainerTestBeforeReconcile_'+Date.now(),raw);
    localStorage.setItem(PROGRESS_KEY,JSON.stringify(fixed.state));
-   syncStatus.textContent='Ujednolicono statystyki pytań z pełnej historii. Odśwież aplikację.';
+   syncStatus.textContent='Ujednolicono statystyki pytań z pełnej historii. Odświeżanie…';
+    location.reload();
    return;
   }
   const next=structuredClone(current);
@@ -606,7 +608,8 @@ async function mergeCloudEvents(){
   if(raw!==null)localStorage.setItem(backup,raw);
   localStorage.setItem(PROGRESS_KEY,JSON.stringify(next));
   localStorage.setItem(EVENT_SEEN_KEY,JSON.stringify([...seen]));
-  syncStatus.textContent='Scalono '+mergedCount+' zdarzeń z chmury. Odśwież aplikację, aby zobaczyć aktualne statystyki.';
+  syncStatus.textContent='Scalono '+mergedCount+' zdarzeń z chmury. Odświeżanie…';
+  location.reload();
  }catch(e){syncStatus.textContent='Pobieranie zdarzeń: '+e.message;console.warn('Łączenie zdarzeń:',e)}
  finally{mergingCloud=false;}
 }

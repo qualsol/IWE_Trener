@@ -501,16 +501,23 @@ async function flushEvents(){
   if(authError||!user)return;
   let queue=eventQueue();
   const seen=eventSeen();
-  for(const entry of queue){
-   const {error}=await client.from('learning_events').upsert({
+  // Wysyłanie paczkami zamiast jednego żądania dla każdej historycznej odpowiedzi.
+  // Kolejka jest utrwalana po każdej udanej paczce; błąd nie usuwa pozostałych zdarzeń.
+  while(queue.length){
+   const batch=queue.slice(0,100);
+   const rows=batch.map(entry=>({
     user_id:user.id,event_id:entry.event_id,device_id:deviceId,
     event_type:entry.event_type,occurred_at:entry.occurred_at,payload:entry.payload
-   },{onConflict:'user_id,event_id',ignoreDuplicates:true});
+   }));
+   const {error}=await client.from('learning_events').upsert(rows,{onConflict:'user_id,event_id',ignoreDuplicates:true});
    if(error)throw error;
-   seen.add(entry.event_id);
+   const completed=new Set(batch.map(x=>x.event_id));
+   for(const id of completed)seen.add(id);
    localStorage.setItem(EVENT_SEEN_KEY,JSON.stringify([...seen]));
-   queue=queue.filter(x=>x.event_id!==entry.event_id);
+   // Nie zgub zdarzeń dopisanych w czasie trwania wysyłki.
+   queue=eventQueue().filter(x=>!completed.has(x.event_id));
    localStorage.setItem(EVENT_QUEUE_KEY,JSON.stringify(queue));
+   syncStatus.textContent='Wysyłanie historii: pozostało '+queue.length+' zdarzeń.';
   }
   if(!queue.length)syncStatus.textContent='Zdarzenia nauki zapisane w chmurze. Sprawdzanie zmian na innych urządzeniach…';
  }catch(e){console.warn('Synchronizacja zdarzeń:',e);syncStatus.textContent='Oczekujące zdarzenia: '+eventQueue().length+'. '+e.message;}

@@ -11,21 +11,32 @@
 <label><input type="checkbox" value="C" class="opt"> C — wariant testowy</label><br><br>
 <button id="answer">Sprawdź odpowiedź w silniku v2</button>
 <p id="result" role="status"></p><div><span class="stat">Odpowiedzi w demonstratorze: <strong id="answered">0</strong></span><span class="stat">Poprawne: <strong id="correct">0</strong></span></div>
-<p class="muted">Demonstrator przechowuje wyniki tylko w pamięci bieżącej karty. Odświeżenie zeruje licznik. Trwały zapis IndexedDB i synchronizacja będą dodane w kolejnych etapach.</p></section>
+<p class="muted">Odpowiedzi są trwale zapisywane w IndexedDB tej przeglądarki. Synchronizacja wymaga zalogowania do konta Supabase.</p></section>
+<section class="card"><h2>Synchronizacja v2</h2><p class="muted">Osobna tabela chmurowa, niezależna od starej historii. Użyj tego samego konta na obu urządzeniach.</p><p><input id="email" type="email" placeholder="Adres e-mail" autocomplete="email" style="padding:10px;max-width:90%"> <input id="password" type="password" placeholder="Hasło" autocomplete="current-password" style="padding:10px;max-width:90%"></p><button id="login">Zaloguj</button> <button id="logout">Wyloguj</button> <button id="sync">Synchronizuj</button><p id="cloudStatus" role="status"></p></section>
 <section class="card"><h2>Diagnostyka</h2><button id="selftest">Uruchom testy silnika</button><pre id="output" role="status"></pre></section>
 <section class="card"><h2>Repozytorium</h2><p><a href="https://github.com/qualsol/IWE_Trener/tree/main/Test_2">Pliki środowiska Test_2</a> · <a href="https://github.com/qualsol/IWE_Trener/tree/iwe-trener-v2">Gałąź rozwojowa v2</a></p></section></main>
 <script type="module">
 import {assertQuestion,makeAnswerEvent,mergeEvents,calculateStats} from './core.mjs';
+import {getEvents,putEvents,syncEvents} from './storage.mjs';
 const question={questionId:'demo-welding-001',revisionId:'v1',options:[{optionId:'A'},{optionId:'B'},{optionId:'C'}],correctOptionIds:['A','C']};
-const events=[];const deviceId=crypto.randomUUID();const sessionId=crypto.randomUUID();
-document.querySelector('#answer').addEventListener('click',()=>{
+let events=[];const deviceId=crypto.randomUUID();const sessionId=crypto.randomUUID();
+async function refresh(){events=mergeEvents(await getEvents());const stats=calculateStats(events);document.querySelector('#answered').textContent=stats.answered;document.querySelector('#correct').textContent=stats.correct}
+refresh().catch(e=>document.querySelector('#result').textContent='IndexedDB: '+e.message);
+document.querySelector('#answer').addEventListener('click',async()=>{
  try{const selectedOptionIds=[...document.querySelectorAll('.opt:checked')].map(e=>e.value);
  const event=makeAnswerEvent({question,selectedOptionIds,sessionId,mode:'demo',deviceId});
- events.push(event);const stats=calculateStats(events);
+ await putEvents([event]);await refresh();const stats=calculateStats(events);
  document.querySelector('#result').textContent=event.correct?'Odpowiedź poprawna. Zdarzenie '+event.eventId:'Odpowiedź niepoprawna. Zdarzenie '+event.eventId;
  document.querySelector('#answered').textContent=stats.answered;document.querySelector('#correct').textContent=stats.correct;
  }catch(e){document.querySelector('#result').textContent='Błąd: '+e.message}
 });
+const CLOUD_URL='https://glaokabmsmfzfraaxkom.supabase.co',CLOUD_KEY='sb_publishable_uduAnhz1kGdgq5cP150FHQ_79r9qFTH';
+let client;
+const cloudStatus=document.querySelector('#cloudStatus');
+async function cloud(){if(client)return client;const mod=await import('https://esm.sh/@supabase/supabase-js@2.57.4');client=mod.createClient(CLOUD_URL,CLOUD_KEY,{auth:{storageKey:'iwe-trener-v2-auth'}});return client}
+document.querySelector('#login').onclick=async()=>{try{const c=await cloud();const {error}=await c.auth.signInWithPassword({email:document.querySelector('#email').value,password:document.querySelector('#password').value});if(error)throw error;cloudStatus.textContent='Zalogowano.'}catch(e){cloudStatus.textContent='Błąd logowania: '+e.message}};
+document.querySelector('#logout').onclick=async()=>{try{const c=await cloud();await c.auth.signOut();cloudStatus.textContent='Wylogowano.'}catch(e){cloudStatus.textContent=e.message}};
+document.querySelector('#sync').onclick=async()=>{try{const c=await cloud();const result=await syncEvents(c,s=>cloudStatus.textContent=s);await refresh();cloudStatus.textContent='Synchronizacja zakończona. Łącznie '+result.localTotal+' zdarzeń.'}catch(e){cloudStatus.textContent='Błąd synchronizacji: '+e.message}};
 document.querySelector('#selftest').addEventListener('click',()=>{
  const tests=[];const check=(name,fn)=>{try{if(!fn())throw Error('niezgodny wynik');tests.push('OK: '+name)}catch(e){tests.push('BŁĄD: '+name+' — '+e.message)}};
  check('Walidacja pytania',()=>assertQuestion(question));

@@ -37,3 +37,9 @@ Ponowny import XLSX zachowuje identyfikator pytania przy zmianie klucza (treść
 - Etap 2: realistyczny egzamin 80 pytań i raport.
 - Etap 3: bezpieczne aktualizacje i historia wersji.
 - Etap 4: synchronizacja między urządzeniami (wymaga zewnętrznej usługi).
+
+## Wersja główna — IWE Trener 2.0
+
+Główna aplikacja jest dostępna pod `https://qualsol.github.io/IWE_Trener/` i korzysta z wbudowanego arkusza `TESTY DO IWE(3).xlsx`. Historia nauki 2.0 jest przechowywana oddzielnie od poprzedniej wersji (bez synchronizacji między urządzeniami). Wersja rozwojowa pozostaje w folderze `TEST_3`.
+
+**Uwaga:** arkusz XLSX jest publicznie dostępny w repozytorium i w witrynie GitHub Pages. Udostępniaj go wyłącznie, jeżeli masz prawo publikować jego zawartość.

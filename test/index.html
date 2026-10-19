@@ -27,7 +27,29 @@ function updateBackupMeta(patch){try{localStorage.setItem(BACKUP_META_KEY,JSON.s
 function backupAgeDays(date){const t=Date.parse(date||'');return Number.isFinite(t)?Math.floor((Date.now()-t)/86400000):null}
 function renderBackupStatus(){const meta=backupMeta(),status=$('#backupStatus'),notice=$('#backupReminder');if(!status)return;const age=backupAgeDays(meta.lastExportAt);status.textContent=age===null?'Brak zarejestrowanej kopii na tym urządzeniu.': 'Ostatni eksport: '+new Date(meta.lastExportAt).toLocaleString('pl-PL')+'. Pamiętaj, aby zachować pobrany plik w bezpiecznym miejscu.';if(notice){const due=(progress.answered||0)>0&&(age===null||age>=BACKUP_INTERVAL_DAYS);notice.hidden=!due;}}
 function validateBackup(obj){if(!obj||obj.format!=='IWE-Trener-backup'||![1,2].includes(obj.version))throw Error('Nieobsługiwany format kopii zapasowej.');const p=obj.progress;if(!p||!p.byId||typeof p.byId!=='object'||Array.isArray(p.byId)||!Array.isArray(p.history)||!Array.isArray(p.examHistory)||!Number.isFinite(p.answered||0)||!Number.isFinite(p.sessions||0))throw Error('Kopia zawiera nieprawidłowe dane postępów.');if(obj.imported!=null&&(!Array.isArray(obj.imported.questions)||!obj.imported.questions.length))throw Error('Nieprawidłowa baza pytań w kopii.');return p}
-const PASS_THRESHOLD=60;let MODULES=['I','II','III','IV','I N','II N','III N','IV N'];let examTimer=null,examDeadline=0,examTimeExpired=false;let progress=loadProgress();progress.history ||= [];progress.examHistory ||= [];function loadProgress(){try{return JSON.parse(localStorage.getItem(STORE))||{byId:{},sessions:0,answered:0,perfect:0}}catch(e){return{byId:{},sessions:0,answered:0,perfect:0}}}function saveProgress(){try{localStorage.setItem(STORE,JSON.stringify(progress));window.dispatchEvent(new Event('iwe-test-progress-saved'))}catch(e){console.warn("Zapis lokalny niedostępny",e)}renderStats();renderBackupStatus()}function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function switchScreen(id){document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));window.scrollTo({top:0,behavior:'smooth'})}function usable(){return questions.filter(q=>q.options.length>0&&($('#includeUnknown').checked||q.hasKey))}function normalizeModule(value){const s=String(value??'').trim().toUpperCase().replace(/^MODUŁ\s*/, '').replace(/^MODUL\s*/, '');const m=s.match(/^(I|II|III|IV)(?:\s*N)?$/);return m?s:s}function selectedModules(){return [...document.querySelectorAll('.module-check:checked')].map(x=>normalizeModule(x.value))}function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}function startQuiz(newMode,review=false,preset=null){stopExamTimer();examTimeExpired=false;mode=newMode;let chosenModules=selectedModules();if(!chosenModules.length){document.querySelectorAll('.module-check').forEach(x=>x.checked=true);chosenModules=MODULES.slice();}let list=usable().filter(q=>chosenModules.includes(normalizeModule(q.module)));
+const PASS_THRESHOLD=60;let MODULES=['I','II','III','IV','I N','II N','III N','IV N'];let examTimer=null,examDeadline=0,examTimeExpired=false;// Identyfikatory starszych zdarzeń są deterministyczne na każdym urządzeniu.
+function legacyEventKey(item,kind){
+ return JSON.stringify([kind,String(item.date||''),String(item.id||''),String(item.module||''),String(item.mode||''),item.correct??null,item.points??null,item.maximum??null,item.questions??null,item.pct??null]);
+}
+function legacyEventId(key,ordinal){
+ const value=key+'#'+ordinal;
+ const hash=(seed)=>{let h=seed>>>0;for(let i=0;i<value.length;i++){h=Math.imul(h^value.charCodeAt(i),16777619)}return(h>>>0).toString(16).padStart(8,'0')};
+ const h=hash(2166136261)+hash(3339675911)+hash(2246822519)+hash(3266489917);
+ return h.slice(0,8)+'-'+h.slice(8,12)+'-5'+h.slice(13,16)+'-a'+h.slice(17,20)+'-'+h.slice(20,32);
+}
+function assignLegacyEventIds(state){
+ let changed=0;
+ for(const [kind,items] of [['answer',state.history||[]],['exam',state.examHistory||[]]]){
+  const counts=new Map();
+  for(const item of items){
+   const key=legacyEventKey(item,kind),ordinal=counts.get(key)||0;
+   counts.set(key,ordinal+1);
+   if(!item.eventId){item.eventId=legacyEventId(key,ordinal);changed++}
+  }
+ }
+ return changed;
+}
+let progress=loadProgress();progress.history ||= [];progress.examHistory ||= [];if(assignLegacyEventIds(progress)){try{const old=localStorage.getItem(STORE);if(old!==null)localStorage.setItem('iweTrainerTestBeforeLegacyIds_'+Date.now(),old);localStorage.setItem(STORE,JSON.stringify(progress))}catch(e){console.warn('Migracja identyfikatorów:',e)}}function loadProgress(){try{return JSON.parse(localStorage.getItem(STORE))||{byId:{},sessions:0,answered:0,perfect:0}}catch(e){return{byId:{},sessions:0,answered:0,perfect:0}}}function saveProgress(){try{localStorage.setItem(STORE,JSON.stringify(progress));window.dispatchEvent(new Event('iwe-test-progress-saved'))}catch(e){console.warn("Zapis lokalny niedostępny",e)}renderStats();renderBackupStatus()}function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function switchScreen(id){document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));window.scrollTo({top:0,behavior:'smooth'})}function usable(){return questions.filter(q=>q.options.length>0&&($('#includeUnknown').checked||q.hasKey))}function normalizeModule(value){const s=String(value??'').trim().toUpperCase().replace(/^MODUŁ\s*/, '').replace(/^MODUL\s*/, '');const m=s.match(/^(I|II|III|IV)(?:\s*N)?$/);return m?s:s}function selectedModules(){return [...document.querySelectorAll('.module-check:checked')].map(x=>normalizeModule(x.value))}function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}function startQuiz(newMode,review=false,preset=null){stopExamTimer();examTimeExpired=false;mode=newMode;let chosenModules=selectedModules();if(!chosenModules.length){document.querySelectorAll('.module-check').forEach(x=>x.checked=true);chosenModules=MODULES.slice();}let list=usable().filter(q=>chosenModules.includes(normalizeModule(q.module)));
 if(!list.length){console.error('IWE: brak pytań dla modułów',chosenModules,'; przykładowe moduły w bazie:',[...new Set(questions.map(q=>q.module))]);alert('Nie znaleziono pytań dla zaznaczonych modułów. Spróbuj odświeżyć aplikację i ponownie wybrać moduły.');return}if(review)list=list.filter(q=>{let p=progress.byId[q.id];return !p||p.lastCorrect===false||p.starred});const focus=$('#learningStrategy')?.value||'all';if(mode==='learn'&&!review&&!preset&&focus!=='all'){list=list.filter(q=>focus==='due'?isDue(q):focus==='weak'?isWeak(q):focus==='starred'?!!progress.byId[q.id]?.starred:true);if(focus==='due')list.sort((a,b)=>dueTime(a)-dueTime(b));if(focus==='weak')list.sort((a,b)=>weakWeight(b)-weakWeight(a));}if(preset==='weakTop'){
  list=questions.filter(q=>q.hasKey&&((progress.byId[q.id]?.incorrect||0)>0)).sort((a,b)=>(progress.byId[b.id]?.incorrect||0)-(progress.byId[a.id]?.incorrect||0)).slice(0,10);
  if(!list.length){alert('Brak pytań z zapisanymi błędami.');return;}
@@ -453,6 +475,11 @@ function captureEvents(){
  try{
   const state=JSON.parse(localStorage.getItem('iweTrainerTestProgressV1')||'null');
   if(!state)return;
+  if(assignLegacyEventIds(state)){
+   const original=localStorage.getItem('iweTrainerTestProgressV1');
+   if(original!==null)localStorage.setItem('iweTrainerTestBeforeLegacyIds_'+Date.now(),original);
+   localStorage.setItem('iweTrainerTestProgressV1',JSON.stringify(state));
+  }
   const seen=eventSeen(),queue=eventQueue();
   const pending=new Set(queue.map(x=>x.event_id));
   for(const [kind,items] of [['answer',state.history||[]],['exam',state.examHistory||[]]]){

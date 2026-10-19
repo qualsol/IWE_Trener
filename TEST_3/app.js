@@ -1,4 +1,4 @@
-const $=s=>document.querySelector(s);let questions=[],session=[],index=0,mode='learn',answers={},results=[],examFlags=new Set(),deferredInstall=null;const STORE='iweTrainerProgressV1';const APP_VERSION='1.4.0',BACKUP_META_KEY='iweTrainerBackupMetaV1',BACKUP_INTERVAL_DAYS=7;
+const $=s=>document.querySelector(s);let questions=[],session=[],index=0,mode='learn',answers={},results=[],examFlags=new Set(),deferredInstall=null;const STORE='iweTrainerTest3ProgressV1';const APP_VERSION='1.4.0',BACKUP_META_KEY='iweTrainerTest3BackupMetaV1',BACKUP_INTERVAL_DAYS=7;
 function backupMeta(){try{return JSON.parse(localStorage.getItem(BACKUP_META_KEY)||'{}')||{}}catch{return {}}}
 function updateBackupMeta(patch){try{localStorage.setItem(BACKUP_META_KEY,JSON.stringify({...backupMeta(),...patch}))}catch(e){console.warn('Nie zapisano informacji o kopii',e)}renderBackupStatus()}
 function backupAgeDays(date){const t=Date.parse(date||'');return Number.isFinite(t)?Math.floor((Date.now()-t)/86400000):null}
@@ -141,7 +141,7 @@ function lineChart(data,threshold){
 }
 
 function setupModules(){const modules=MODULES;const host=$('#moduleChoices');if(!host)throw new Error('Brak kontenera modułów');host.innerHTML=modules.map(m=>`<label class="module-choice"><input class="module-check" type="checkbox" value="${m}" checked> <span>Moduł ${m}</span><small class="module-count">${questions.filter(q=>normalizeModule(q.module)===m).length} pytań</small></label>`).join('');host.querySelectorAll('.module-check').forEach(input=>input.addEventListener('change',()=>{input.closest('.module-choice').classList.toggle('chosen',input.checked)}));host.querySelectorAll('.module-check').forEach(input=>input.closest('.module-choice').classList.add('chosen'));}
-const IMPORT_STORE='iweTrainerExcelImportV1';
+const IMPORT_STORE='iweTrainerTest3ExcelImportV1';
 function hashText(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
 function questionFingerprint(q){return JSON.stringify([normalizeModule(q.module),q.question.trim(),q.options.map(o=>[o.letter,o.text.trim(),o.correct])])}
 function idForQuestion(q,legacyMap,occurrence){

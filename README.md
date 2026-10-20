@@ -43,3 +43,16 @@ Ponowny import XLSX zachowuje identyfikator pytania przy zmianie klucza (treść
 Główna aplikacja jest dostępna pod `https://qualsol.github.io/IWE_Trener/` i korzysta z wbudowanego arkusza `TESTY DO IWE(3).xlsx`. Historia nauki 2.0 jest przechowywana oddzielnie od poprzedniej wersji (bez synchronizacji między urządzeniami). Wersja rozwojowa pozostaje w folderze `TEST_3`.
 
 **Uwaga:** arkusz XLSX jest publicznie dostępny w repozytorium i w witrynie GitHub Pages. Udostępniaj go wyłącznie, jeżeli masz prawo publikować jego zawartość.
+
+## Historia wersji
+
+### 2.0.0-test — 20.10.2026 — zamknięcie rozwoju funkcjonalnego
+
+- Uznano obecny zestaw funkcji IWE Trener 2.0 za wystarczający do przygotowania do egzaminu IWE.
+- Dostępne funkcje: sesje nauki, powtórki, egzaminy próbne, historia wyników, statystyki postępów i wykresy.
+- Opanowanie pytania wymaga co najmniej trzech kolejnych poprawnych odpowiedzi udzielonych w co najmniej dwóch różnych dniach.
+- Uporządkowano filtry „Moduł” i „Wskaźnik” bezpośrednio przy wykresach postępów.
+- Decyzja projektowa: wstrzymanie dodawania nowych funkcji; dalsze zmiany ograniczone do naprawy błędów, stabilności i weryfikacji merytorycznej pytań oraz kluczy odpowiedzi.
+- Status: wersja funkcjonalnie zamknięta, weryfikacja niezawodności i statystyk pozostaje zadaniem kontrolnym; nie oznacza zakończenia wszystkich testów.
+- Punkt odniesienia kodu przed wpisem: commit `d3085096f21891ea174a37cd7317f42eaa1ac68e` (gałąź `main`).
+

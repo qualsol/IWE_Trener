@@ -22,7 +22,7 @@
 <label for="cloudFileUrl"><strong>Link do pliku JSON na Google Drive</strong></label>
 <input id="cloudFileUrl" type="url" placeholder="https://drive.google.com/file/d/..." style="display:block;width:100%;max-width:100%;margin:8px 0 12px;padding:11px;border:1px solid var(--line);border-radius:9px">
 <div class="backup-controls"><button id="cloudSaveUrlBtn" type="button" class="secondary">Zapisz link</button><button id="cloudOpenBtn" type="button" class="secondary">1. Otwórz plik na Drive</button><label class="import-file">2. Scal pobrany JSON<input id="cloudMergeFile" type="file" accept=".json,application/json"></label><button id="cloudExportBtn" type="button" class="secondary">3. Pobierz scalony JSON</button></div>
-<p id="cloudStatus" class="muted" role="status" aria-live="polite"></p>
+<label for="cloudFileName"><strong>Nazwa pliku JSON na Google Drive</strong></label><input id="cloudFileName" type="text" placeholder="np. moje_wyniki_IWE.json" style="display:block;width:100%;max-width:100%;margin:8px 0 12px;padding:11px;border:1px solid var(--line);border-radius:9px"><p class="muted">Po udanym scaleniu nazwa uzupełnia się z pobranego pliku. Możesz ją poprawić, jeśli przeglądarka dodała np. „(1)”.</p><p id="cloudStatus" class="muted" role="status" aria-live="polite"></p>
 <p class="muted"><strong>Instrukcja:</strong> Otwórz link i pobierz najnowszy plik JSON na urządzenie. Następnie wybierz ten plik przyciskiem „Scal pobrany JSON”. Po pomyślnym scaleniu pobierz nowy JSON i <strong>ręcznie zastąp nim poprzedni plik na Google Drive</strong>. Przed nadpisaniem sprawdź, czy nikt inny nie zmienił pliku w chmurze. Nie nadpisuj pliku, jeżeli scalanie się nie powiodło.</p>
 <p class="muted">Uwaga: link udostępniony publicznie umożliwia innym osobom odczyt historii nauki. Ustaw udostępnianie świadomie. Przy ręcznym zastępowaniu pliku zachowaj ten sam plik/link, zamiast usuwać go i tworzyć nowy.</p></div>
 <div class="panel import-panel"><div class="section-title"><h2>Baza pytań — Excel</h2><span class="muted">Aktualizacja bez serwera</span></div><p>Edytuj plik <strong>TESTY DO IWE.xlsx</strong>, zapisz zmiany i kliknij <strong>Importuj Excel</strong>. Nowa baza zostanie zapamiętana na tym komputerze.</p><div class="import-actions"><label class="import-file">Importuj Excel (.xlsx)<input id="excelFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label><button class="secondary" type="button" id="restoreBaseBtn">Przywróć bazę wbudowaną</button></div><p id="importInfo" class="import-info" aria-live="polite">Baza wbudowana</p><p id="importStatus" class="muted" aria-live="polite"></p><p class="muted import-note">Po każdej zmianie pliku Excel ponownie użyj przycisku importu. Dotychczasowe statystyki pozostają zapisane. Przy zmianie treści lub klucza pytanie otrzymuje nowy identyfikator.</p></div>
@@ -281,7 +281,7 @@ function toggleStar(){const q=session[index];if(!q)return;const p=progress.byId[
 function stopExamTimer(){if(examTimer){clearInterval(examTimer);examTimer=null}examDeadline=0;const e=$('#examClock');if(e)e.classList.add('hidden')}
 function startExamTimer(){if(mode!=='exam')return;const mins=Number($('#examMinutes')?.value||0);if(!mins)return;examDeadline=Date.now()+mins*60000;const clock=$('#examClock');clock.classList.remove('hidden');function tick(){const remaining=Math.max(0,Math.ceil((examDeadline-Date.now())/1000));clock.textContent=`Pozostało: ${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;if(remaining<=0&&!examTimeExpired){examTimeExpired=true;stopExamTimer();finishQuiz();alert('Czas egzaminu minął. Niezaznaczone odpowiedzi zostały ocenione jako pominięte.')}}tick();examTimer=setInterval(tick,1000)}
 function downloadJson(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-async function exportBackup(){const imported=activeImported||await readImportedDb().catch(()=>null);downloadJson('IWE_Trener_kopia_'+new Date().toISOString().slice(0,10)+'.json',{format:'IWE-Trener-backup',version:3,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),progress,imported});updateBackupMeta({lastExportAt:new Date().toISOString()})}
+async function exportBackup(filename){const imported=activeImported||await readImportedDb().catch(()=>null);downloadJson(filename||'IWE_Trener_kopia_'+new Date().toISOString().slice(0,10)+'.json',{format:'IWE-Trener-backup',version:3,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),progress,imported});updateBackupMeta({lastExportAt:new Date().toISOString()})}
 
 // Kontrola spójności: stare egzaminy nie mają examId, więc ich punktacji nie rekonstruujemy.
 function auditExamHistory(p){
@@ -438,6 +438,12 @@ async function mergeBackup(file){
 
 // Google Drive: tylko ręczne pobieranie i nadpisywanie, bez żądań CORS.
 const CLOUD_URL_KEY='iweTrainerCloudJsonUrlV1';
+const CLOUD_NAMES_KEY='iweTrainerCloudFileNamesV1';
+function cloudNames(){try{return JSON.parse(localStorage.getItem(CLOUD_NAMES_KEY)||'{}')||{}}catch{return {}}}
+function safeCloudName(name){const n=String(name||'').trim();if(!n||n==='.'||n==='..'||/[\\/\\\\<>:"|?*\\x00-\\x1f]/.test(n)||!n.toLowerCase().endsWith('.json'))throw Error('Podaj nazwę pliku zakończoną .json, bez znaków specjalnych.');return n}
+function rememberCloudName(){const value=configuredCloudUrl(),id=cloudFileId(new URL(value)),name=safeCloudName($('#cloudFileName').value);const names=cloudNames();names[id]=name;localStorage.setItem(CLOUD_NAMES_KEY,JSON.stringify(names));return name}
+function refreshCloudName(){try{const id=cloudFileId(new URL(configuredCloudUrl()));$('#cloudFileName').value=cloudNames()[id]||''}catch{$('#cloudFileName').value=''}}
+
 function cloudStatus(message){const el=$('#cloudStatus');if(el)el.textContent=message}
 function cloudFileId(url){const m=url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)||url.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);return m?.[1]||url.searchParams.get('id')}
 function configuredCloudUrl(){
@@ -446,8 +452,9 @@ function configuredCloudUrl(){
  if(url.protocol!=='https:'||!['drive.google.com','docs.google.com','drive.usercontent.google.com'].includes(url.hostname)||!cloudFileId(url))throw Error('Wklej poprawny link HTTPS do pliku na Google Drive.');
  return value;
 }
-function saveCloudUrl(){const value=configuredCloudUrl();localStorage.setItem(CLOUD_URL_KEY,value);cloudStatus('Link zapisany lokalnie na tym urządzeniu.')}
-$('#cloudFileUrl').value=localStorage.getItem(CLOUD_URL_KEY)||'';
+function saveCloudUrl(){const value=configuredCloudUrl();localStorage.setItem(CLOUD_URL_KEY,value);if($('#cloudFileName').value.trim())rememberCloudName();cloudStatus('Link i nazwa pliku zapisane na tym urządzeniu.')}
+$('#cloudFileUrl').value=localStorage.getItem(CLOUD_URL_KEY)||'';refreshCloudName();
+$('#cloudFileUrl').addEventListener('change',refreshCloudName);
 $('#cloudSaveUrlBtn').addEventListener('click',()=>{try{saveCloudUrl()}catch(e){cloudStatus(e.message)}});
 $('#cloudOpenBtn').addEventListener('click',()=>{
  try{const value=configuredCloudUrl();localStorage.setItem(CLOUD_URL_KEY,value);window.open(value,'_blank','noopener,noreferrer');cloudStatus('Pobierz aktualny JSON z Google Drive, a następnie wybierz go w kroku 2.')}
@@ -458,13 +465,13 @@ $('#cloudMergeFile').addEventListener('change',async e=>{
  const before=progress;
  await mergeBackup(file);
  // mergeBackup pokazuje własne potwierdzenie i komunikat błędu.
- if(progress!==before)cloudStatus('Scalanie zakończone. Teraz pobierz nowy JSON (krok 3) i ręcznie zaktualizuj plik na Drive.');
+ if(progress!==before){$('#cloudFileName').value=file.name;try{rememberCloudName()}catch(err){cloudStatus('Scalono wyniki, ale nazwa pliku wymaga poprawienia: '+err.message);e.target.value='';return}cloudStatus('Scalanie zakończone. Eksport użyje nazwy: '+file.name+'. Sprawdź, czy jest taka sama jak na Google Drive.');}
  else cloudStatus('Nie potwierdzono scalania. Nie nadpisuj jeszcze pliku na Google Drive.');
  e.target.value='';
 });
 $('#cloudExportBtn').addEventListener('click',async()=>{
  if(!confirm('Czy przed eksportem pobrano i scalono najnowszy plik z Google Drive? Nie nadpisuj pliku w chmurze, jeśli mógł się zmienić od pobrania.'))return;
- try{await exportBackup();cloudStatus('JSON pobrany. Zastąp nim ręcznie zawartość istniejącego pliku na Google Drive, zachowując jego link.')}
+ try{const filename=rememberCloudName();await exportBackup(filename);cloudStatus('Pobrano JSON jako „'+filename+'”. Zastąp nim ręcznie istniejący plik na Google Drive, zachowując link.')}
  catch(e){cloudStatus('Nie udało się wyeksportować JSON: '+e.message)}
 });
 

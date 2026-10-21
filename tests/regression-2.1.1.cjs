@@ -23,5 +23,34 @@ test('Session conflict detected',()=>{assert.throws(()=>ctx.mergeSessionRecords(
 const dataset=make();let n=0;
 for(let s=0;s<8;s++){const mode=s<5?'learn':'exam',sid='session-'+s,date='2026-10-'+String(10+s)+'T12:00:00Z',correctCounts=[8,4,10,6,3,4,7,5];dataset.sessionHistory.push({sessionId:sid,mode,date,questions:10,answered:10});const rows=[];for(let i=0;i<10;i++){const row=evt('a'+n++,sid,date.slice(0,14)+String(i).padStart(2,'0')+':00Z',i<correctCounts[s],'q'+i,mode);rows.push(row);dataset.history.push(row)}if(mode==='exam')dataset.examHistory.push(exam('ex-'+s,sid,date,rows))}
 test('5 learning sessions + 3 exams, 80 answers',()=>{const m=ctx.mergeProgressData(make(),dataset);assert.equal(m.sessions,8);assert.equal(m.answered,80);assert.equal(m.perfect,47);assert.equal(m.examHistory.length,3);const again=ctx.mergeProgressData(m,dataset);assert.equal(again.answered,80);assert.equal(again.sessions,8);assert.equal(again.examHistory.length,3)});
+test('Local day retained during merge near UTC midnight',()=>{
+ const p=make();
+ p.history=[
+  {...evt('mid1','mid-session','2026-10-20T22:30:00Z',true),localDay:'2026-10-21'},
+  {...evt('mid2','mid-session','2026-10-21T22:30:00Z',true),localDay:'2026-10-22'},
+  {...evt('mid3','mid-session','2026-10-22T12:30:00Z',true),localDay:'2026-10-22'}
+ ];
+ p.sessionHistory=[{sessionId:'mid-session',mode:'learn',date:'2026-10-22T12:30:00Z',questions:3,answered:3}];
+ const merged=ctx.mergeProgressData(make(),p);
+ assert.equal(merged.byId.q1.streak,3);
+ assert.deepEqual(Array.from(merged.byId.q1.reviewDays),['2026-10-21','2026-10-22']);
+ assert.equal(merged.byId.q1.reviewDays.length,2);
+ assert(html.includes('localDay:localCalendarDate(new Date())'));
+});
+test('JSON v3 backup validator accepts exported structure',()=>{
+ const v=section('function validateBackup(', 'const PASS_THRESHOLD=');
+ vm.runInContext(v,ctx);
+ const p=ctx.mergeProgressData(make(),dataset);
+ const backup={format:'IWE-Trener-backup',version:3,progress:p,imported:null};
+ assert.equal(ctx.validateBackup(backup),p);
+ assert.throws(()=>ctx.validateBackup({...backup,version:2}),/Nieobsługiwany/);
+ assert.throws(()=>ctx.validateBackup({...backup,progress:{...p,history:[{id:'q1'}]}}),/identyfikatorów/);
+});
+test('JSON v3 backup with exam summaries can be merged',()=>{
+ const p=ctx.mergeProgressData(make(),dataset);
+ const copy=JSON.parse(JSON.stringify(p));
+ assert.equal(ctx.mergeProgressData(p,copy).examHistory.length,3);
+ assert.equal(ctx.mergeProgressData(p,copy).answered,80);
+});
 test('Exam scores reconcile',()=>{for(const x of dataset.examHistory){const rows=dataset.history.filter(e=>e.examId===x.examId);assert.equal(rows.length,x.questions);assert.equal(rows.reduce((a,e)=>a+e.points,0),x.points);assert.equal(rows.reduce((a,e)=>a+e.maximum,0),x.maximum)}});
 console.log('RESULT '+pass+' passed; 0 failed');

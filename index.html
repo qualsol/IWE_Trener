@@ -5,7 +5,7 @@
 
 .history-charts{display:grid;gap:18px;margin-top:16px}.chart-card{border:1px solid var(--border,#d8e0e8);border-radius:14px;padding:16px;min-width:0}.chart-card h3{margin:0 0 8px}.chart-scroll{width:100%;max-width:100%;min-width:0;overflow-x:hidden}.chart-scroll svg{width:100%;max-width:100%;min-width:0;height:auto;display:block}.chart-empty{padding:20px 0}
 .import-panel{border:1px solid #b8d0ed;background:#f6faff}.import-panel h2{margin:0}.import-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0}.import-file{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;background:#2563eb;color:#fff;padding:11px 16px;font-weight:750;cursor:pointer}.import-file input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.import-panel .muted{font-size:13px}.import-info{font-weight:650;margin-top:10px}.import-note{margin:8px 0 0}
-.study-panel{background:#f8fbff;border:1px solid #cbdced}.study-buttons{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}.study-buttons button{flex:1;min-width:160px}.mastery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:14px}.mastery-item{border:1px solid #dce5ed;border-radius:12px;padding:12px;background:white}.mastery-item>div:first-child{display:flex;flex-direction:column;align-items:flex-start;gap:4px}.mastery-item span,.mastery-item small{font-size:12px;color:#647789}.mastery-item .bar{margin:8px 0 2px}.backup-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.backup-controls button,.backup-controls label{margin:0}.exam-clock{font-weight:850;color:#b42318;background:#fff1f1;border-radius:9px;padding:6px 10px}.quiz-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 14px}.quiz-tools button{font-size:13px}
+.study-panel{background:#f8fbff;border:1px solid #cbdced}.study-buttons{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}.study-buttons button{flex:1;min-width:160px}.mastery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:14px}.mastery-item{border:1px solid #dce5ed;border-radius:12px;padding:12px;background:white}.mastery-item>div:first-child{display:flex;flex-direction:column;align-items:flex-start;gap:4px}.mastery-item span,.mastery-item small{font-size:12px;color:#647789}.mastery-item .bar{margin:8px 0 2px}.backup-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.backup-controls button,.backup-controls label{margin:0}.backup-controls .import-file{position:relative;transition:background .15s,outline .15s}.backup-controls .import-file.drag-over{background:#164bbd;outline:3px dashed #93c5fd;outline-offset:3px}.backup-controls .import-file:focus-within{outline:2px solid #93c5fd;outline-offset:2px}.exam-clock{font-weight:850;color:#b42318;background:#fff1f1;border-radius:9px;padding:6px 10px}.quiz-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 14px}.quiz-tools button{font-size:13px}
 @media(max-width:600px){.module-choice{min-width:0;gap:5px;padding:9px 7px;font-size:12px}.module-choice input{flex:0 0 16px;width:16px;height:16px}.module-choice span{min-width:0;flex:0 1 auto}.module-count{flex:0 0 auto;margin-left:auto;font-size:9px;letter-spacing:-.15px}.chart-card{padding:10px}.chart-card h3{font-size:17px}.chart-scroll{overflow-x:hidden}}</style><title>IWE — Trener egzaminacyjny</title></head>
 <body><header class="top"><div class="brand"><div class="logo">IWE</div><div><strong>Trener egzaminacyjny</strong><small>Twoja baza pytań · działa offline</small><small title="Łączna liczba udzielonych odpowiedzi, również na powtarzane pytania" style="display:block;white-space:nowrap">Odpowiedzi:&nbsp;<strong id="headerAnsweredCount" style="display:inline">0</strong></small></div></div><button id="installBtn" class="install hidden">Zainstaluj</button></header>
 <main>
@@ -374,6 +374,26 @@ $('#starQuestionBtn').addEventListener('click',toggleStar);
 $('#exportBackupBtn').addEventListener('click',exportBackup);
 $('#backupFile').addEventListener('change',e=>restoreBackup(e.target.files[0]));
 $('#mergeFile').addEventListener('change',e=>mergeBackup(e.target.files[0]));
+function enableJsonDrop(inputId,handler){
+ const input=document.getElementById(inputId),zone=input.closest('label');
+ if(!zone)return;
+ const valid=file=>file&&(/\.json$/i.test(file.name)||file.type==='application/json');
+ for(const type of ['dragenter','dragover']){
+  zone.addEventListener(type,event=>{event.preventDefault();event.stopPropagation();if(event.dataTransfer)event.dataTransfer.dropEffect='copy';zone.classList.add('drag-over')});
+ }
+ for(const type of ['dragleave','dragend']){
+  zone.addEventListener(type,event=>{event.preventDefault();event.stopPropagation();if(type==='dragleave'&&zone.contains(event.relatedTarget))return;zone.classList.remove('drag-over')});
+ }
+ zone.addEventListener('drop',event=>{
+  event.preventDefault();event.stopPropagation();zone.classList.remove('drag-over');
+  const files=[...(event.dataTransfer?.files||[])];
+  if(files.length!==1||!valid(files[0])){alert('Upuść jeden plik kopii zapasowej w formacie JSON.');return}
+  handler(files[0]);
+ });
+}
+enableJsonDrop('backupFile',restoreBackup);
+enableJsonDrop('mergeFile',mergeBackup);
+
 $('#startDueBtn').addEventListener('click',()=>{$('#learningStrategy').value='due';startQuiz('learn')});
 $('#startWeakBtn').addEventListener('click',()=>{$('#learningStrategy').value='weak';startQuiz('learn')});
 (function addStudyActions(){

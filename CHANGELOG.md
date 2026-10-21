@@ -1,5 +1,13 @@
 # Historia wersji — IWE Trener
 
+## 2.1.2 — 2026-10-21
+
+- T21-02: historia nowych odpowiedzi przechowuje `localDay` (lokalny dzień nauki), który jest używany podczas odtwarzania serii i dni powtórek przy scalaniu JSON.
+- Zachowano zgodność ze starszymi wpisami v3 bez `localDay`; dla nich pozostaje awaryjne wyznaczanie dnia z daty UTC. Nie da się odzyskać oryginalnej strefy czasowej historycznych wpisów.
+- Rozszerzono testy regresyjne o przypadek odpowiedzi przy północy UTC, walidację kopii JSON v3 oraz ponowne scalanie tej samej kopii z egzaminami.
+- Zwiększono wersję aplikacji do 2.1.2 oraz cache PWA do `iwe-trener-main-v28`.
+- Testy rzeczywistej synchronizacji między dwoma urządzeniami oraz pełny test przeglądarkowy pozostają do wykonania.
+
 ## 2.1.1 — 2026-10-21
 
 - Poprawiono scalanie historii egzaminów: rekordy `examHistory` są identyfikowane przez `eventId` i `examId`, bez nieprawidłowego wymagania `sessionId`; nadal wykrywane są konflikty identyfikatorów.

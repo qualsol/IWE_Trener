@@ -267,7 +267,7 @@ function weakWeight(q){const p=progress.byId[q.id]||{};return (p.starred?10:0)+(
 function localCalendarDate(date){const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`}
 function updateSpacedSchedule(p,correct){const now=new Date();const today=localCalendarDate(now);if(correct===true){p.streak=(p.streak||0)+1;p.reviewDays=[...new Set([...(p.reviewDays||[]),today])].slice(-30);const delays=[1,3,7,14,30,60,90];const d=delays[Math.min(p.streak-1,delays.length-1)];p.nextReview=new Date(now.getTime()+d*86400000).toISOString();}else{p.streak=0;p.reviewDays=[];p.nextReview=new Date(now.getTime()+86400000).toISOString()}}
 function mastered(q){const p=progress.byId[q.id];return !!p&&p.lastCorrect===true&&(p.streak||0)>=3&&(p.reviewDays||[]).length>=2}
-function renderLearningDashboard(){const host=$('#learningDashboard');if(!host)return;const due=questions.filter(q=>q.hasKey&&isDue(q)).length,weak=questions.filter(isWeak).length,master=questions.filter(mastered).length,unseen=questions.filter(q=>(progress.byId[q.id]?.attempts||0)===0).length;host.innerHTML=`<div class="progress-summary"><div class="progress-box"><strong>${due}<\/strong><span>do powtórki<\/span><\/div><div class="progress-box"><strong>${weak}<\/strong><span>słabe punkty<\/span><\/div><div class="progress-box"><strong>${master}<\/strong><span>opanowane<\/span><\/div><div class="progress-box"><strong>${unseen}<\/strong><span>nierozwiązane<\/span><\/div><\/div><p class="muted">Pytanie opanowane: co najmniej 3 poprawne odpowiedzi z rzędu w minimum 2 różnych dniach. Nowe pytania są dostępne w powtórkach.<\/p><div class="mastery-grid">${MODULES.map(m=>{const qs=questions.filter(q=>normalizeModule(q.module)===m&&q.hasKey),done=qs.filter(mastered).length,seen=qs.filter(q=>!!progress.byId[q.id]).length,pct=qs.length?Math.round(done/qs.length*100):0;return `<div class="mastery-item"><div><strong>${esc(m)}<\/strong><span>${done}/${qs.length} opanowanych<\/span><span>${seen} poznanych<\/span><\/div><div class="bar"><span style="width:${pct}%"><\/span><\/div><small>${pct}%<\/small><\/div>`}).join('')}<\/div>`}
+function renderLearningDashboard(){const host=$('#learningDashboard');if(!host)return;const due=questions.filter(q=>q.hasKey&&isDue(q)).length,weak=questions.filter(isWeak).length,master=questions.filter(mastered).length,unseen=questions.filter(q=>(progress.byId[q.id]?.attempts||0)===0).length;host.innerHTML=`<div class="progress-summary"><div class="progress-box"><strong>${due}<\/strong><span>do powtórki<\/span><\/div><div class="progress-box"><strong>${weak}<\/strong><span>słabe punkty<\/span><\/div><div class="progress-box"><strong>${master}<\/strong><span>opanowane<\/span><\/div><div class="progress-box"><strong>${unseen}<\/strong><span>nierozwiązane<\/span><\/div><\/div><p class="muted">Pytanie opanowane: co najmniej 3 poprawne odpowiedzi z rzędu w minimum 2 różnych dniach. Nowe pytania są dostępne w powtórkach.<\/p><div class="mastery-grid">${MODULES.map(m=>{const qs=questions.filter(q=>normalizeModule(q.module)===m&&q.hasKey),done=qs.filter(mastered).length,seen=qs.filter(q=>(progress.byId[q.id]?.attempts||0)>0).length,pct=qs.length?Math.round(done/qs.length*100):0;return `<div class="mastery-item"><div><strong>${esc(m)}<\/strong><span>${done}/${qs.length} opanowanych<\/span><span>${seen} poznanych<\/span><\/div><div class="bar"><span style="width:${pct}%"><\/span><\/div><small>${pct}%<\/small><\/div>`}).join('')}<\/div>`}
 function updateStarButton(){const b=$('#starQuestionBtn');if(!b||!session[index])return;const starred=!!progress.byId[session[index].id]?.starred;b.textContent=starred?'★ Usuń z trudnych':'☆ Oznacz jako trudne';b.setAttribute('aria-pressed',String(starred))}
 function toggleStar(){const q=session[index];if(!q)return;const p=progress.byId[q.id]||{attempts:0,correct:0,starred:false};p.starred=!p.starred;progress.byId[q.id]=p;saveProgress();updateStarButton()}
 function stopExamTimer(){if(examTimer){clearInterval(examTimer);examTimer=null}examDeadline=0;const e=$('#examClock');if(e)e.classList.add('hidden')}
@@ -340,6 +340,17 @@ function mergeEvents(a,b){
  }
  return [...seen.values()].sort((x,y)=>x.date.localeCompare(y.date)||x.eventId.localeCompare(y.eventId));
 }
+// Exam summaries have examId (not sessionId); validate them separately from answer events.
+function mergeExamEvents(a,b){
+ const seen=new Map();
+ for(const e of [...(a||[]),...(b||[])]){
+  if(!e||!e.eventId||!e.examId||!e.date)throw Error('Egzamin bez wymaganych identyfikatorów.');
+  const old=seen.get(e.eventId);
+  if(old&&JSON.stringify(old)!==JSON.stringify(e))throw Error('Konflikt identyfikatora egzaminu '+e.eventId);
+  seen.set(e.eventId,e);
+ }
+ return [...seen.values()].sort((x,y)=>x.date.localeCompare(y.date)||x.eventId.localeCompare(y.eventId));
+}
 function mergeSessionRecords(a,b){
  const seen=new Map();
  for(const e of [...(a||[]),...(b||[])]){
@@ -352,7 +363,7 @@ function mergeSessionRecords(a,b){
 }
 function mergeProgressData(local,remote){
  const history=mergeEvents(local.history,remote.history);
- const examHistory=mergeEvents(local.examHistory,remote.examHistory);
+ const examHistory=mergeExamEvents(local.examHistory,remote.examHistory);
  const sessionHistory=mergeSessionRecords(local.sessionHistory,remote.sessionHistory);
  const byId={};
  const ids=new Set([...Object.keys(local.byId||{}),...Object.keys(remote.byId||{})]);

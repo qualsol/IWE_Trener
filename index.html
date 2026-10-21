@@ -438,7 +438,7 @@ async function mergeBackup(file){
 // Opcjonalny plik chmurowy: tylko odczyt; zapis do Google Drive pozostaje ręczny.
 const CLOUD_URL_KEY='iweTrainerCloudJsonUrlV1';
 function cloudStatus(message){const el=$('#cloudStatus');if(el)el.textContent=message}
-function cloudFileId(url){const m=url.pathname.match(/\\/file\\/d\\/([a-zA-Z0-9_-]+)/)||url.pathname.match(/\\/d\\/([a-zA-Z0-9_-]+)/);return m?.[1]||url.searchParams.get('id')}
+function cloudFileId(url){const m=url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)||url.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);return m?.[1]||url.searchParams.get('id')}
 function configuredCloudUrl(){
  const value=$('#cloudFileUrl').value.trim();if(!value)throw Error('Wprowadź adres pliku Google Drive.');
  let url;try{url=new URL(value)}catch{throw Error('Nieprawidłowy adres URL.')}

@@ -52,5 +52,21 @@ test('JSON v3 backup with exam summaries can be merged',()=>{
  assert.equal(ctx.mergeProgressData(p,copy).examHistory.length,3);
  assert.equal(ctx.mergeProgressData(p,copy).answered,80);
 });
+test('Reset preserves JSON v3 structure for backup restoration',()=>{
+ const resetLiteral='progress={byId:{},sessions:0,answered:0,perfect:0,history:[],examHistory:[],sessionHistory:[],lastMistakes:[],lastExamMistakes:[]}';
+ assert(html.includes(resetLiteral),'Reset must initialize sessionHistory');
+ const reset={byId:{},sessions:0,answered:0,perfect:0,history:[],examHistory:[],sessionHistory:[],lastMistakes:[],lastExamMistakes:[]};
+ assert.equal(ctx.validateBackup({format:'IWE-Trener-backup',version:3,progress:reset}),reset);
+ const before=ctx.mergeProgressData(make(),dataset);
+ const restored=JSON.parse(JSON.stringify(before));
+ const afterReset=JSON.parse(JSON.stringify(reset));
+ const merged=ctx.mergeProgressData(afterReset,restored);
+ assert.equal(merged.sessions,8);
+ assert.equal(merged.answered,80);
+ assert.equal(merged.examHistory.length,3);
+ const repeated=ctx.mergeProgressData(merged,restored);
+ assert.equal(repeated.sessions,8);
+ assert.equal(repeated.answered,80);
+});
 test('Exam scores reconcile',()=>{for(const x of dataset.examHistory){const rows=dataset.history.filter(e=>e.examId===x.examId);assert.equal(rows.length,x.questions);assert.equal(rows.reduce((a,e)=>a+e.points,0),x.points);assert.equal(rows.reduce((a,e)=>a+e.maximum,0),x.maximum)}});
 console.log('RESULT '+pass+' passed; 0 failed');

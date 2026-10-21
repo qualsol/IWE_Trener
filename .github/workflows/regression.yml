@@ -1,0 +1,15 @@
+name: IWE Trener regression tests
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test main app regression logic
+        run: node tests/regression-2.1.1.cjs

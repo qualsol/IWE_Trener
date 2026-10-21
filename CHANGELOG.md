@@ -1,5 +1,12 @@
 # Historia wersji — IWE Trener
 
+## 2.1.3 — 2026-10-21
+
+- T21-04: naprawiono reset wyników. Po wyczyszczeniu postępów inicjalizowane są wszystkie wymagane tablice `history`, `examHistory`, `sessionHistory`, `lastMistakes` i `lastExamMistakes`, aby nowa kopia JSON v3 była poprawna.
+- Dodano regresję dla cyklu danych: historia 5 sesji nauki i 3 egzaminów → eksport JSON v3 → reset → przywrócenie → ponowne scalanie bez podwójnego liczenia.
+- Zaktualizowano widoczną wersję w stopce i historii zmian do 2.1.3 oraz cache PWA do `iwe-trener-main-v30`.
+- Testy interakcji w rzeczywistej przeglądarce nadal wymagają odrębnego wykonania.
+
 ## 2.1.2 — 2026-10-21
 
 - T21-02: historia nowych odpowiedzi przechowuje `localDay` (lokalny dzień nauki), który jest używany podczas odtwarzania serii i dni powtórek przy scalaniu JSON.

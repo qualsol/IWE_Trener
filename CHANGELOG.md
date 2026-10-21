@@ -1,5 +1,13 @@
 # Historia wersji — IWE Trener
 
+## 2.1.1 — 2026-10-21
+
+- Poprawiono scalanie historii egzaminów: rekordy `examHistory` są identyfikowane przez `eventId` i `examId`, bez nieprawidłowego wymagania `sessionId`; nadal wykrywane są konflikty identyfikatorów.
+- Poprawiono licznik poznanych pytań w zestawieniu modułów: samo oznaczenie gwiazdką nie jest traktowane jako udzielenie odpowiedzi.
+- Dodano testy regresyjne `tests/regression-2.1.1.cjs` oraz workflow GitHub Actions do ich uruchamiania po zmianach w `main`.
+- Zwiększono wersję aplikacji do 2.1.1 i identyfikator cache PWA do `iwe-trener-main-v27`.
+- Nadal do sprawdzenia: różnice między datami lokalnymi i UTC w harmonogramie opanowania, testy przeglądarkowe i synchronizacja między urządzeniami.
+
 ## 2.1 — 2026-10-21
 
 - Nowy system zapisu postępów: unikalne identyfikatory odpowiedzi (`eventId`), sesji (`sessionId`) oraz egzaminów (`examId`).

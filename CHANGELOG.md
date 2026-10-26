@@ -1,5 +1,14 @@
 # Historia wersji — IWE Trener
 
+## 2.2 — 2026-10-26
+
+- Zapis postępów, historii odpowiedzi, sesji i egzaminów przeniesiono z limitowanego localStorage do IndexedDB.
+- Dodano oddzielną produkcyjną bazę danych i opcjonalne kopiowanie wyników z TEST_2_2 lub poprzedniej wersji 2.1.3 bez kasowania źródła.
+- Zachowano format kopii JSON v3, scalanie po unikalnych identyfikatorach, przywracanie i eksport wyników.
+- Zweryfikowano scalanie wyników pomiędzy komputerem i telefonem oraz trwałość wyników po ponownym uruchomieniu aplikacji.
+- Testy syntetyczne: scalanie 75 000 odpowiedzi i osobny przeglądarkowy test IndexedDB do 150 000 odpowiedzi. Pełny audyt wszystkich funkcji nie został jeszcze zakończony.
+- Zaktualizowano oznaczenie wersji w stopce, historię zmian, manifest PWA i pamięć podręczną.
+
 ## 2.1.3 — 2026-10-21
 
 - T21-04: naprawiono reset wyników. Po wyczyszczeniu postępów inicjalizowane są wszystkie wymagane tablice `history`, `examHistory`, `sessionHistory`, `lastMistakes` i `lastExamMistakes`, aby nowa kopia JSON v3 była poprawna.
